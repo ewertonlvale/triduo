@@ -242,8 +242,10 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <div class="campo"><label for="forma">Forma de pagamento</label><select id="forma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
         <div class="campo"><label for="data">Data</label><input type="date" id="data" required></div>
         <div class="campo"><label for="responsavel">Responsável</label><input type="text" id="responsavel" placeholder="Quem registrou"></div>
+        <div class="campo full"><label for="detalhamento">Detalhamento (opcional)</label><textarea id="detalhamento" rows="2" placeholder="Observações, itens do gasto, contexto..." style="padding:10px;border:1px solid var(--borda);border-radius:8px;font-size:16px;font-family:inherit;resize:vertical;width:100%"></textarea></div>
         <div class="campo"><label for="finFile">Comprovante (opcional)</label><input type="file" id="finFile" accept="image/*,.pdf"></div>
         <button type="submit" class="btn-add" id="btnAddFin">+ Adicionar lançamento</button>
+        <button type="button" class="btn-add hide" id="btnCancelFin" style="background:#7a8896">Cancelar edição</button>
       </form>
     </div>
 
@@ -267,9 +269,9 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
     <div class="aviso" style="background:#eaf6ef;border-color:#bfe3cd">💡 Camisas <b>pagas</b> já entram nas Receitas. Aqui lance doações, barracas e as <b>despesas</b> (inclusive a compra das camisas).</div>
     <div class="lista">
       <table>
-        <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Forma</th><th>Resp.</th><th class="num">Valor</th><th></th><th></th></tr></thead>
+        <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Forma</th><th>Resp.</th><th class="num">Valor</th><th></th><th></th><th></th></tr></thead>
         <tbody id="corpoFin"></tbody>
-        <tfoot><tr><td colspan="5">Saldo (filtro atual)</td><td class="valor" id="footFin">R$ 0,00</td><td colspan="2"></td></tr></tfoot>
+        <tfoot><tr><td colspan="5">Saldo (filtro atual)</td><td class="valor" id="footFin">R$ 0,00</td><td colspan="3"></td></tr></tfoot>
       </table>
       <div class="vazio" id="vazioFin">Carregando…</div>
     </div>
@@ -419,6 +421,7 @@ const TAMANHOS = (Array.isArray(_CFG.TAMANHOS) && _CFG.TAMANHOS.length) ? _CFG.T
 const LS="triduo_supabase_cfg";
 let sb=null, tipo="receita";
 let categorias=[], fin=[], estoque=[], vendas=[];
+let editFinId=null;
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const brl=n=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const hoje=()=>new Date().toISOString().slice(0,10);
@@ -456,7 +459,8 @@ function ligarEventos(){
   $("#btnCat").onclick=()=>{ const p=$("#catPainel"); p.style.display=p.style.display==="none"?"block":"none"; };
   $("#formCat").onsubmit=addCategoria;
   $("#catChips").onclick=e=>{ if(e.target.dataset.del&&confirm("Remover esta categoria?")) delFrom("categorias",e.target.dataset.del); };
-  $("#corpoFin").onclick=e=>{ if(e.target.classList.contains("del")&&confirm("Excluir este lançamento?")) delFrom("lancamentos",e.target.dataset.id); };
+  $("#corpoFin").onclick=e=>{ const t=e.target.closest("[data-edit],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir este lançamento?")) delFrom("lancamentos",t.dataset.id); } else if(t.dataset.edit){ editarFin(t.dataset.edit); } };
+  $("#btnCancelFin").onclick=cancelarEdicaoFin;
   $("#formEst").onsubmit=addEstoque; $("#formVenda").onsubmit=addVenda;
   $("#buscaV").oninput=renderVendas; $("#filtroPag").onchange=renderVendas;
   $("#filtroTam").onchange=renderVendas; $("#filtroEnt").onchange=renderVendas; $("#filtroForma").onchange=renderVendas;
@@ -524,16 +528,40 @@ function renderCategorias(){
 }
 
 /* ---------- FINANCEIRO ---------- */
+function rotuloBtnFin(){ return editFinId?"Salvar alterações":"+ Adicionar lançamento"; }
+function cancelarEdicaoFin(){
+  editFinId=null; $("#btnCancelFin").classList.add("hide");
+  $("#formFin").reset(); $("#data").value=hoje(); setTipo("receita");
+  $("#btnAddFin").textContent=rotuloBtnFin();
+}
+function editarFin(id){
+  const d=fin.find(x=>x.id===id); if(!d) return;
+  editFinId=id; setTipo(d.tipo);
+  $("#desc").value=d.descricao||""; $("#valor").value=d.valor;
+  $("#forma").value=d.forma||""; $("#data").value=d.data||hoje(); $("#responsavel").value=d.responsavel||""; $("#detalhamento").value=d.detalhamento||"";
+  $("#categoria").value=d.categoria||"";
+  if(d.categoria && $("#categoria").value!==d.categoria){ $("#categoria").insertAdjacentHTML("beforeend",`<option value="${esc(d.categoria)}">${esc(d.categoria)}</option>`); $("#categoria").value=d.categoria; }
+  $("#finFile").value="";
+  $("#btnAddFin").textContent="Salvar alterações"; $("#btnCancelFin").classList.remove("hide");
+  $("#formFin").scrollIntoView({behavior:"smooth",block:"center"});
+}
 async function addFin(e){
   e.preventDefault();
   const v=parseFloat($("#valor").value);
   if(isNaN(v)||v<=0){ alert("Informe um valor válido."); return; }
+  const temArquivo=$("#finFile").files&&$("#finFile").files[0];
   $("#btnAddFin").disabled=true; $("#btnAddFin").textContent="Salvando…";
-  let url=null; try{ url=await subirComprovante($("#finFile"),"financeiro"); }catch(err){ $("#btnAddFin").disabled=false; $("#btnAddFin").textContent="+ Adicionar lançamento"; return; }
-  const {error}=await sb.from("lancamentos").insert({tipo,descricao:$("#desc").value.trim(),valor:v,categoria:$("#categoria").value,forma:$("#forma").value,comprovante_url:url,data:$("#data").value,responsavel:$("#responsavel").value.trim()});
-  $("#btnAddFin").disabled=false; $("#btnAddFin").textContent="+ Adicionar lançamento";
-  if(error){ alert("Erro ao salvar: "+error.message); return; }
-  e.target.reset(); $("#data").value=hoje(); setTipo("receita"); carregarTudo();
+  let url=null;
+  try{ if(temArquivo) url=await subirComprovante($("#finFile"),"financeiro"); }
+  catch(err){ $("#btnAddFin").disabled=false; $("#btnAddFin").textContent=rotuloBtnFin(); return; }
+  const reg={tipo,descricao:$("#desc").value.trim(),valor:v,categoria:$("#categoria").value,forma:$("#forma").value,data:$("#data").value,responsavel:$("#responsavel").value.trim(),detalhamento:$("#detalhamento").value.trim()};
+  if(temArquivo) reg.comprovante_url=url;
+  let error;
+  if(editFinId){ ({error}=await sb.from("lancamentos").update(reg).eq("id",editFinId)); }
+  else { reg.comprovante_url=url; ({error}=await sb.from("lancamentos").insert(reg)); }
+  $("#btnAddFin").disabled=false;
+  if(error){ $("#btnAddFin").textContent=rotuloBtnFin(); alert("Erro ao salvar: "+error.message); return; }
+  cancelarEdicaoFin(); carregarTudo();
 }
 function receitaCamisas(){ return vendas.reduce((s,v)=>s+Number(v.valor_pago||0),0); }
 function formaTag(f){ if(!f) return ""; const cls=f==="Pix"?"pix":f==="Dinheiro"?"dinheiro":f==="Cartão"?"cartao":""; return `<span class="forma ${cls}">${esc(f)}</span>`; }
@@ -547,7 +575,7 @@ function renderFin(){
   const q=$("#busca").value.toLowerCase(), ft=$("#filtroTipo").value;
   const lista=fin.filter(d=>{ if(ft&&d.tipo!==ft) return false; if(q&&!((d.descricao||"")+" "+(d.categoria||"")+" "+(d.responsavel||"")).toLowerCase().includes(q)) return false; return true; });
   $("#corpoFin").innerHTML=lista.map(d=>{ const s=d.tipo==="receita"?"+":"−", c=d.tipo==="receita"?"rec":"desp";
-    return `<tr><td>${fmtData(d.data)}</td><td><b>${esc(d.descricao)||"—"}</b> <span class="tag ${c}">${d.tipo==="receita"?"Rec.":"Desp."}</span></td><td>${esc(d.categoria)||"—"}</td><td>${formaTag(d.forma)||"—"}</td><td>${esc(d.responsavel)||"—"}</td><td class="valor ${c}">${s} ${brl(d.valor)}</td><td>${anexo(d.comprovante_url)}</td><td><button class="del" data-id="${d.id}">🗑</button></td></tr>`; }).join("");
+    return `<tr><td>${fmtData(d.data)}</td><td><b>${esc(d.descricao)||"—"}</b> <span class="tag ${c}">${d.tipo==="receita"?"Rec.":"Desp."}</span>${d.detalhamento?`<div style="font-size:.8rem;color:#7a8896;white-space:normal;max-width:320px">${esc(d.detalhamento)}</div>`:""}</td><td>${esc(d.categoria)||"—"}</td><td>${formaTag(d.forma)||"—"}</td><td>${esc(d.responsavel)||"—"}</td><td class="valor ${c}">${s} ${brl(d.valor)}</td><td>${anexo(d.comprovante_url)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${d.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${d.id}" title="Excluir">🗑</button></td></tr>`; }).join("");
   $("#vazioFin").style.display=lista.length?"none":"block"; $("#vazioFin").textContent="Nenhum lançamento ainda.";
   const sf=lista.reduce((s,d)=>s+(d.tipo==="receita"?Number(d.valor):-Number(d.valor)),0);
   $("#footFin").textContent=brl(sf);
@@ -652,6 +680,21 @@ function abrirGerenciar(id){
           ?`<button class="btn-sec" id="mSalvarObs" style="flex:1">Salvar observação</button><button class="btn-sec" id="mDesent" style="flex:1">Desmarcar entrega</button>`
           :`<button class="btn-sec" id="mEntregar" style="flex:1;background:#1a56db;color:#fff;border:none">Confirmar entrega</button>`}
       </div>
+    </div>
+
+    <div class="box">
+      <h4>✏️ Editar dados do pedido</h4>
+      <div class="campo" style="margin-bottom:8px"><label>Comprador</label><input type="text" id="eComprador" value="${esc(v.comprador)}"></div>
+      <div class="linha-inp">
+        <div class="campo"><label>Tamanho</label><select id="eTam">${optsTam(v.tamanho)}</select></div>
+        <div class="campo"><label>Qtd</label><input type="number" id="eQtd" min="1" step="1" value="${v.quantidade}"></div>
+        <div class="campo"><label>Valor unit.</label><input type="number" id="eUnit" step="0.01" min="0" value="${Number(v.valor_unit)}"></div>
+      </div>
+      <div class="linha-inp" style="margin-top:8px">
+        <div class="campo"><label>Forma</label><select id="eForma">${optsForma(v.forma)}</select></div>
+        <div class="campo"><label>Data</label><input type="date" id="eData" value="${v.data||hoje()}"></div>
+        <button class="btn-sec" id="eSalvar" style="background:var(--verde);color:#fff;border:none;padding:10px 14px">Salvar dados</button>
+      </div>
     </div>`;
   $("#modalBg").classList.remove("hide");
   $("#mFechar").onclick=fecharModal;
@@ -660,6 +703,20 @@ function abrirGerenciar(id){
   const be=$("#mEntregar"); if(be) be.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim()); };
   const bo=$("#mSalvarObs"); if(bo) bo.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim()); };
   const bd=$("#mDesent"); if(bd) bd.onclick=async()=>{ await salvarEntrega(id,false,$("#mObs").value.trim()); };
+  $("#eSalvar").onclick=()=>editarVenda(id);
+}
+function optsTam(sel){ const lista=TAMANHOS.includes(sel)||!sel?TAMANHOS:[sel,...TAMANHOS]; return lista.map(t=>`<option${t===sel?" selected":""}>${esc(t)}</option>`).join(""); }
+function optsForma(sel){ return ['','Dinheiro','Pix','Cartão','Outro'].map(f=>`<option value="${f}"${f===(sel||"")?" selected":""}>${f||"—"}</option>`).join(""); }
+async function editarVenda(id){
+  const v=vendas.find(x=>x.id===id); if(!v) return;
+  const qtd=Math.max(1,parseInt($("#eQtd").value)||1);
+  const unit=parseFloat($("#eUnit").value); if(isNaN(unit)||unit<0){ alert("Valor unitário inválido."); return; }
+  const total=+(qtd*unit).toFixed(2);
+  let pago=Number(v.valor_pago); if(pago>total) pago=total;
+  const upd={ comprador:$("#eComprador").value.trim()||null, tamanho:$("#eTam").value, quantidade:qtd, valor_unit:unit, valor_total:total, valor_pago:pago, forma:$("#eForma").value||null, data:$("#eData").value };
+  const {error}=await sb.from("camisas_vendas").update(upd).eq("id",id);
+  if(error){ alert("Erro: "+error.message); return; }
+  fecharModal(); await carregarTudo();
 }
 async function registrarPagamento(v,valor,forma){
   const total=Number(v.valor_total);
@@ -775,7 +832,7 @@ async function importarCam(e){
 
 /* ---------- EXPORTS ---------- */
 function baixarCSV(nome,cab,linhas){ const csv="﻿"+cab.join(";")+"\n"+linhas.join("\n"); const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})); a.download=nome; a.click(); }
-function exportarFin(){ if(!fin.length){ alert("Nada para exportar."); return; } baixarCSV("triduo-financeiro-"+hoje()+".csv",["data","tipo","descricao","categoria","forma","responsavel","valor","comprovante"],fin.map(d=>[d.data,d.tipo,d.descricao,d.categoria,d.forma,d.responsavel,Number(d.valor).toFixed(2),d.comprovante_url].map(campoCSV).join(";"))); }
+function exportarFin(){ if(!fin.length){ alert("Nada para exportar."); return; } baixarCSV("triduo-financeiro-"+hoje()+".csv",["data","tipo","descricao","detalhamento","categoria","forma","responsavel","valor","comprovante"],fin.map(d=>[d.data,d.tipo,d.descricao,d.detalhamento,d.categoria,d.forma,d.responsavel,Number(d.valor).toFixed(2),d.comprovante_url].map(campoCSV).join(";"))); }
 function exportarCam(){ if(!vendas.length){ alert("Nada para exportar."); return; } baixarCSV("triduo-camisas-"+hoje()+".csv",["data","comprador","tamanho","quantidade","valor_unit","valor_total","valor_pago","falta","forma","situacao","entregue","entregue_em","entrega_obs","responsavel","comprovante"],vendas.map(v=>[v.data,v.comprador,v.tamanho,v.quantidade,Number(v.valor_unit).toFixed(2),Number(v.valor_total).toFixed(2),Number(v.valor_pago).toFixed(2),Math.max(0,Number(v.valor_total)-Number(v.valor_pago)).toFixed(2),v.forma,situacao(v),v.entregue?"sim":"não",v.entregue_em||"",v.entrega_obs||"",v.responsavel,v.comprovante_url].map(campoCSV).join(";"))); }
 function campoCSV(v){ v=String(v??""); return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
 function fmtData(iso){ if(!iso) return "—"; const [a,m,d]=iso.split("-"); return `${d}/${m}/${a.slice(2)}`; }
