@@ -232,7 +232,8 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <div class="card"><div class="rot">💳 Saldo em conta</div><div class="val" id="saldoConta" style="color:var(--azul)">R$ 0,00</div></div>
       <div class="card"><div class="rot">💵 Dinheiro no caixa</div><div class="val" id="saldoCaixa" style="color:var(--verde-esc)">R$ 0,00</div></div>
     </div>
-    <div class="painel">
+    <button class="btn-add" id="btnNovoFin" style="margin:0 0 14px">➕ Novo lançamento</button>
+    <div class="painel hide" id="painelFin">
       <h2>Novo lançamento</h2>
       <form id="formFin">
         <div class="campo full"><label>Tipo</label>
@@ -289,7 +290,11 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <div class="card info"><div class="rot">Vendidas</div><div class="val" id="camVend">0</div></div>
       <div class="card saldo"><div class="rot">Em estoque</div><div class="val" id="camDisp">0</div></div>
     </div>
-    <div class="painel">
+    <div style="display:flex; gap:8px; margin-bottom:14px">
+      <button class="btn-add" id="btnNovaVenda" style="flex:2; margin:0">➕ Registrar venda</button>
+      <button class="btn-sec" id="btnEstoque" style="flex:1; padding:12px">👕 Estoque por tamanho</button>
+    </div>
+    <div class="painel hide" id="painelEstoque">
       <h2>Estoque por tamanho</h2>
       <p style="font-size:.82rem;color:#7a8896;margin:0 0 12px">Registre quantas camisas há de cada tamanho. O sistema desconta conforme as vendas.</p>
       <form id="formEst">
@@ -307,7 +312,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <div class="vazio" id="vazioEst">Nenhum tamanho cadastrado ainda.</div>
       </div>
     </div>
-    <div class="painel">
+    <div class="painel hide" id="painelVenda">
       <h2>Registrar venda de camisa</h2>
       <form id="formVenda">
         <div class="campo full"><label for="vComprador">Comprador</label><input type="text" id="vComprador" placeholder="Nome de quem comprou"></div>
@@ -465,6 +470,9 @@ function ligarEventos(){
   $("#busca").oninput=renderFin; $("#filtroTipo").onchange=renderFin;
   $("#btnReload").onclick=carregarTudo; $("#btnExportFin").onclick=exportarFin; $("#formFin").onsubmit=addFin;
   $("#btnCat").onclick=()=>{ const p=$("#catPainel"); p.style.display=p.style.display==="none"?"block":"none"; };
+  $("#btnNovoFin").onclick=()=>$("#painelFin").classList.toggle("hide");
+  $("#btnNovaVenda").onclick=()=>$("#painelVenda").classList.toggle("hide");
+  $("#btnEstoque").onclick=()=>$("#painelEstoque").classList.toggle("hide");
   $("#formCat").onsubmit=addCategoria;
   $("#catChips").onclick=e=>{ if(e.target.dataset.del&&confirm("Remover esta categoria?")) delFrom("categorias",e.target.dataset.del); };
   $("#corpoFin").onclick=e=>{ const t=e.target.closest("[data-edit],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir este lançamento?")) delFrom("lancamentos",t.dataset.id); } else if(t.dataset.edit){ editarFin(t.dataset.edit); } };
@@ -550,8 +558,9 @@ function editarFin(id){
   $("#categoria").value=d.categoria||"";
   if(d.categoria && $("#categoria").value!==d.categoria){ $("#categoria").insertAdjacentHTML("beforeend",`<option value="${esc(d.categoria)}">${esc(d.categoria)}</option>`); $("#categoria").value=d.categoria; }
   $("#finFile").value="";
+  $("#painelFin").classList.remove("hide");
   $("#btnAddFin").textContent="Salvar alterações"; $("#btnCancelFin").classList.remove("hide");
-  $("#formFin").scrollIntoView({behavior:"smooth",block:"center"});
+  $("#painelFin").scrollIntoView({behavior:"smooth",block:"center"});
 }
 async function addFin(e){
   e.preventDefault();
