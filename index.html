@@ -228,6 +228,10 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <div class="card desp"><div class="rot">Despesas</div><div class="val" id="totDesp">R$ 0,00</div></div>
       <div class="card saldo" id="cardSaldo"><div class="rot">Saldo</div><div class="val" id="totSaldo">R$ 0,00</div></div>
     </div>
+    <div class="cards" style="grid-template-columns:1fr 1fr; margin-top:-8px">
+      <div class="card"><div class="rot">💳 Saldo em conta</div><div class="val" id="saldoConta" style="color:var(--azul)">R$ 0,00</div></div>
+      <div class="card"><div class="rot">💵 Dinheiro no caixa</div><div class="val" id="saldoCaixa" style="color:var(--verde-esc)">R$ 0,00</div></div>
+    </div>
     <div class="painel">
       <h2>Novo lançamento</h2>
       <form id="formFin">
@@ -350,6 +354,10 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
           <div class="rel-box"><div class="r">Receitas totais</div><div class="v" style="color:var(--verde)" id="relRec">R$ 0,00</div></div>
           <div class="rel-box"><div class="r">Despesas totais</div><div class="v" style="color:var(--vermelho)" id="relDesp">R$ 0,00</div></div>
           <div class="rel-box"><div class="r">Saldo final</div><div class="v" id="relSaldo">R$ 0,00</div></div>
+        </div>
+        <div class="rel-grid" style="grid-template-columns:1fr 1fr; margin-top:10px">
+          <div class="rel-box"><div class="r">💳 Saldo em conta</div><div class="v" id="relConta" style="color:var(--azul)">R$ 0,00</div></div>
+          <div class="rel-box"><div class="r">💵 Dinheiro no caixa</div><div class="v" id="relCaixa" style="color:var(--verde-esc)">R$ 0,00</div></div>
         </div>
       </div>
 
@@ -564,6 +572,17 @@ async function addFin(e){
   cancelarEdicaoFin(); carregarTudo();
 }
 function receitaCamisas(){ return vendas.reduce((s,v)=>s+Number(v.valor_pago||0),0); }
+// Dinheiro fica no caixa; o resto (Pix/cartão/outros/sem forma) fica em conta.
+function saldoCaixaDinheiro(){
+  const isDin=f=>(f||"").trim().toLowerCase()==="dinheiro";
+  let caixa=0;
+  fin.forEach(d=>{ if(isDin(d.forma)) caixa+=Number(d.valor)*(d.tipo==="receita"?1:-1); });
+  vendas.forEach(v=>{ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[];
+    if(pg.length){ pg.forEach(p=>{ if(isDin(p.forma)) caixa+=Number(p.valor)||0; }); }
+    else if(Number(v.valor_pago)>0 && isDin(v.forma)){ caixa+=Number(v.valor_pago); }
+  });
+  return Math.round(caixa*100)/100;
+}
 function formaTag(f){ if(!f) return ""; const cls=f==="Pix"?"pix":f==="Dinheiro"?"dinheiro":f==="Cartão"?"cartao":""; return `<span class="forma ${cls}">${esc(f)}</span>`; }
 function anexo(url){ return url?`<a class="anexo" href="${url}" target="_blank" title="Ver comprovante">📎</a>`:""; }
 function renderFin(){
@@ -572,6 +591,9 @@ function renderFin(){
   const rec=recM+receitaCamisas();
   $("#totRec").textContent=brl(rec); $("#totDesp").textContent=brl(desp); $("#totSaldo").textContent=brl(rec-desp);
   $("#cardSaldo").classList.toggle("neg",(rec-desp)<0);
+  const caixa=saldoCaixaDinheiro(), conta=(rec-desp)-caixa;
+  if($("#saldoCaixa")) $("#saldoCaixa").textContent=brl(caixa);
+  if($("#saldoConta")) $("#saldoConta").textContent=brl(conta);
   const q=$("#busca").value.toLowerCase(), ft=$("#filtroTipo").value;
   const lista=fin.filter(d=>{ if(ft&&d.tipo!==ft) return false; if(q&&!((d.descricao||"")+" "+(d.categoria||"")+" "+(d.responsavel||"")).toLowerCase().includes(q)) return false; return true; });
   $("#corpoFin").innerHTML=lista.map(d=>{ const s=d.tipo==="receita"?"+":"−", c=d.tipo==="receita"?"rec":"desp";
@@ -747,6 +769,7 @@ function renderRelatorio(){
   const rec=recM+recCamisas;
   $("#relRec").textContent=brl(rec); $("#relDesp").textContent=brl(desp);
   $("#relSaldo").textContent=brl(rec-desp); $("#relSaldo").style.color=(rec-desp)<0?"var(--vermelho)":"var(--azul)";
+  const relCx=saldoCaixaDinheiro(); $("#relCaixa").textContent=brl(relCx); $("#relConta").textContent=brl((rec-desp)-relCx);
 
   // por categoria
   const porCat=tp=>{ const m={}; fin.filter(d=>d.tipo===tp).forEach(d=>{ const k=d.categoria||"(sem categoria)"; m[k]=(m[k]||0)+Number(d.valor); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
