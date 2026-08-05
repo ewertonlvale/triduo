@@ -9,6 +9,6 @@
 // Nunca use a chave "service_role" aqui.
 // ============================================================
 window.TRIDUO_CONFIG = {
-  SUPABASE_URL: "",
-  SUPABASE_ANON_KEY: ""
+  SUPABASE_URL: "https://brvjhwyswkwfxxoqebwj.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_TegRlRpIxcyt_BjuUfvsaQ_8sbFLMXG"
 };
