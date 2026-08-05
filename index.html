@@ -32,6 +32,7 @@
   .cards{display:grid; gap:10px; margin-bottom:18px}
   .cards.c3{grid-template-columns:repeat(3,1fr)}
   .cards.c4{grid-template-columns:repeat(4,1fr)}
+  .cards.c5{grid-template-columns:repeat(5,1fr)}
   .card{background:#fff; border-radius:12px; padding:14px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,.06)}
   .card .rot{font-size:.7rem; text-transform:uppercase; letter-spacing:.5px; color:#7a8896}
   .card .val{font-size:1.15rem; font-weight:700; margin-top:4px}
@@ -118,7 +119,7 @@
   table.rel tfoot td{font-weight:700; background:#f7f9fb}
   .assinaturas{display:grid; grid-template-columns:1fr 1fr; gap:40px; margin-top:40px}
   .assina{border-top:1px solid #333; padding-top:6px; text-align:center; font-size:.82rem}
-  @media(max-width:600px){ .cards.c3,.cards.c4{grid-template-columns:1fr 1fr} form{grid-template-columns:1fr} .rel-grid{grid-template-columns:1fr} }
+  @media(max-width:600px){ .cards.c3,.cards.c4,.cards.c5{grid-template-columns:1fr 1fr} form{grid-template-columns:1fr} .rel-grid{grid-template-columns:1fr} }
   @media print{
     body{background:#fff}
     header{background:#fff; color:#000; padding:6px 0 0}
@@ -284,10 +285,11 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
 
   <!-- ===== ABA CAMISAS ===== -->
   <div id="app-cam" class="hide">
-    <div class="cards c4">
+    <div class="cards c5">
       <div class="card rec"><div class="rot">Arrecadado</div><div class="val" id="camArrec">R$ 0,00</div></div>
       <div class="card alerta"><div class="rot">Falta receber</div><div class="val" id="camFalta">R$ 0,00</div></div>
       <div class="card info"><div class="rot">Vendidas</div><div class="val" id="camVend">0</div></div>
+      <div class="card"><div class="rot">Entregues</div><div class="val" id="camEnt" style="color:#1a56db">0</div></div>
       <div class="card saldo"><div class="rot">Em estoque</div><div class="val" id="camDisp">0</div></div>
     </div>
     <div style="display:flex; gap:8px; margin-bottom:14px">
@@ -638,8 +640,9 @@ function renderCamisas(){
   const arrec=receitaCamisas();
   const falta=vendas.reduce((s,v)=>s+Math.max(0,Number(v.valor_total)-Number(v.valor_pago)),0);
   const vend=vendas.reduce((s,v)=>s+Number(v.quantidade||0),0);
+  const entTot=vendas.reduce((s,v)=>s+(v.entregue?Number(v.quantidade||0):0),0);
   const totEstoque=estoque.reduce((s,e)=>s+Number(e.quantidade||0),0);
-  $("#camArrec").textContent=brl(arrec); $("#camFalta").textContent=brl(falta); $("#camVend").textContent=vend; $("#camDisp").textContent=(totEstoque-vend);
+  $("#camArrec").textContent=brl(arrec); $("#camFalta").textContent=brl(falta); $("#camVend").textContent=vend; $("#camEnt").textContent=entTot; $("#camDisp").textContent=(totEstoque-vend);
   renderEstoque(); renderVendas();
 }
 function vendidasPorTam(t){ return vendas.filter(v=>(v.tamanho||"").toLowerCase()===t.toLowerCase()).reduce((s,v)=>s+Number(v.quantidade||0),0); }
