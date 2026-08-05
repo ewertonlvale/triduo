@@ -91,7 +91,7 @@
   .copiar{position:absolute; top:8px; right:8px; background:#2c3e50; color:#fff; border:none; padding:4px 10px; border-radius:6px; cursor:pointer; font-size:.72rem}
   .aviso{background:#fff8e1; border:1px solid #ffe08a; border-radius:8px; padding:10px 12px; font-size:.82rem; margin:12px 0}
   .erro{color:var(--vermelho); font-size:.85rem; margin-top:8px; min-height:18px}
-  .hide{display:none}
+  .hide{display:none !important}
   /* Modal gerenciar */
   .modal-bg{position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:flex-start; justify-content:center; padding:24px 12px; z-index:50; overflow:auto}
   .modal{background:#fff; border-radius:14px; max-width:460px; width:100%; padding:18px; box-shadow:0 10px 40px rgba(0,0,0,.2)}
@@ -411,8 +411,8 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ====== COLE URL E CHAVE AQUI para todos abrirem já conectados ao banco ====== */
-const SUPABASE_URL = "https://brvjhwyswkwfxxoqebwj.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_TegRlRpIxcyt_BjuUfvsaQ_8sbFLMXG";
+const SUPABASE_URL = "";
+const SUPABASE_ANON_KEY = "";
 /* ============================================================================ */
 
 const LS="triduo_supabase_cfg";
@@ -433,9 +433,11 @@ async function iniciar(){
   try{ sb=supabase.createClient(cfg.url,cfg.key); }catch(e){ $("#setup").classList.remove("hide"); setStatus("off","Erro de config"); return; }
   $("#setup").classList.add("hide");
   ligarEventos();
-  const {data:{session}}=await sb.auth.getSession();
-  if(session) mostrarApp(); else mostrarLogin();
-  sb.auth.onAuthStateChange((_e,s)=>{ if(s) mostrarApp(); else mostrarLogin(); });
+  try{
+    const r=await sb.auth.getSession();
+    if(r&&r.data&&r.data.session) mostrarApp(); else mostrarLogin();
+  }catch(e){ mostrarLogin(); }
+  try{ sb.auth.onAuthStateChange((_e,s)=>{ if(s) mostrarApp(); else mostrarLogin(); }); }catch(e){}
 }
 function mostrarLogin(){ setStatus("off","Faça login"); $("#login").classList.remove("hide"); $("#tabs").classList.add("hide"); $("#btnSair").classList.add("hide"); $("#app-fin").classList.add("hide"); $("#app-cam").classList.add("hide"); }
 function mostrarApp(){ $("#login").classList.add("hide"); $("#tabs").classList.remove("hide"); $("#btnSair").classList.remove("hide"); $("#app-fin").classList.remove("hide"); $("#data").value=hoje(); $("#vData").value=hoje(); carregarTudo(); assinar(); }
