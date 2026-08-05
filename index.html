@@ -287,7 +287,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <h2>Estoque por tamanho</h2>
       <p style="font-size:.82rem;color:#7a8896;margin:0 0 12px">Registre quantas camisas há de cada tamanho. O sistema desconta conforme as vendas.</p>
       <form id="formEst">
-        <div class="campo"><label for="estTam">Tamanho</label><input type="text" id="estTam" placeholder="Ex.: P, M, G, GG, Infantil" required></div>
+        <div class="campo"><label for="estTam">Tamanho</label><select id="estTam" required></select></div>
         <div class="campo"><label for="estQtd">Quantidade que entrou</label><input type="number" id="estQtd" min="1" step="1" placeholder="Ex.: 50" required></div>
         <div class="campo full"><label for="estObs">Observação (opcional)</label><input type="text" id="estObs" placeholder="Ex.: 1ª remessa da gráfica"></div>
         <button type="submit" class="btn-add" style="background:var(--roxo)">+ Adicionar ao estoque</button>
@@ -305,7 +305,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <h2>Registrar venda de camisa</h2>
       <form id="formVenda">
         <div class="campo full"><label for="vComprador">Comprador</label><input type="text" id="vComprador" placeholder="Nome de quem comprou"></div>
-        <div class="campo"><label for="vTam">Tamanho</label><input type="text" id="vTam" list="tams" placeholder="Ex.: M" required><datalist id="tams"></datalist></div>
+        <div class="campo"><label for="vTam">Tamanho</label><select id="vTam" required></select></div>
         <div class="campo"><label for="vQtd">Quantidade</label><input type="number" id="vQtd" min="1" step="1" value="1" required></div>
         <div class="campo"><label for="vUnit">Valor unitário (R$)</label><input type="number" id="vUnit" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
         <div class="campo"><label for="vPago">Valor pago agora (R$)</label><input type="number" id="vPago" step="0.01" min="0" placeholder="0,00" inputmode="decimal"></div>
@@ -415,6 +415,8 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
 const _CFG = (typeof window!=="undefined" && window.TRIDUO_CONFIG) ? window.TRIDUO_CONFIG : {};
 const SUPABASE_URL = _CFG.SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = _CFG.SUPABASE_ANON_KEY || "";
+const TAMANHOS = (Array.isArray(_CFG.TAMANHOS) && _CFG.TAMANHOS.length) ? _CFG.TAMANHOS
+  : ["PP Baby Look","P Baby Look","M Baby Look","G Baby Look","GG Baby Look","PP Normal","P Normal","M Normal","G Normal","GG Normal","Infantil 6 anos","Infantil 8 anos","Infantil 12 anos"];
 /* ============================================================================ */
 
 const LS="triduo_supabase_cfg";
@@ -462,6 +464,7 @@ function ligarEventos(){
   $("#buscaV").oninput=renderVendas; $("#filtroPag").onchange=renderVendas; $("#btnExportCam").onclick=exportarCam;
   $("#filtroTam").onchange=renderVendas; $("#filtroEnt").onchange=renderVendas; $("#filtroForma").onchange=renderVendas;
   $("#btnImportCam").onclick=()=>$("#fileCam").click(); $("#fileCam").onchange=importarCam;
+  fillTamSelects();
   $("#corpoEst").onclick=e=>{ if(e.target.classList.contains("del")&&confirm("Remover esta entrada de estoque?")) delFrom("camisas_estoque",e.target.dataset.id); };
   $("#corpoVenda").onclick=onVendaClick;
   $("#btnPrint").onclick=()=>window.print();
@@ -472,6 +475,10 @@ async function entrar(e){
   $("#btnEntrar").disabled=false; $("#btnEntrar").textContent="Entrar";
   if(error){ $("#loginErro").textContent="E-mail ou senha incorretos."; return; }
   $("#formLogin").reset();
+}
+function fillTamSelects(){
+  const opts='<option value="">— selecione —</option>'+TAMANHOS.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");
+  ["#estTam","#vTam"].forEach(sel=>{ const el=$(sel); if(el){ const atual=el.value; el.innerHTML=opts; if(TAMANHOS.includes(atual)) el.value=atual; } });
 }
 function setTipo(t){ tipo=t; $("#btnRec").className=t==="receita"?"ativo-rec":""; $("#btnDesp").className=t==="despesa"?"ativo-desp":""; $("#btnAddFin").style.background=t==="receita"?"var(--verde)":"var(--vermelho)"; fillCatSelect(); }
 
@@ -571,8 +578,7 @@ async function addVenda(e){
   e.target.reset(); $("#vQtd").value=1; $("#vData").value=hoje(); carregarTudo();
 }
 function renderCamisas(){
-  const tams=[...new Set([...estoque.map(e=>e.tamanho),...vendas.map(v=>v.tamanho)].filter(Boolean))].sort((a,b)=>a.localeCompare(b));
-  $("#tams").innerHTML=tams.map(t=>`<option value="${esc(t)}">`).join("");
+  const tams=[...new Set([...TAMANHOS,...estoque.map(e=>e.tamanho),...vendas.map(v=>v.tamanho)].filter(Boolean))];
   const ft=$("#filtroTam"); if(ft){ const atual=ft.value; ft.innerHTML='<option value="">Tamanho: todos</option>'+tams.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join(""); if(tams.includes(atual)) ft.value=atual; }
   const arrec=receitaCamisas();
   const falta=vendas.reduce((s,v)=>s+Math.max(0,Number(v.valor_total)-Number(v.valor_pago)),0);

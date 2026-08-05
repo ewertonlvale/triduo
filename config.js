@@ -9,6 +9,14 @@
 // Nunca use a chave "service_role" aqui.
 // ============================================================
 window.TRIDUO_CONFIG = {
-  SUPABASE_URL: "https://brvjhwyswkwfxxoqebwj.supabase.co",
-  SUPABASE_ANON_KEY: "sb_publishable_TegRlRpIxcyt_BjuUfvsaQ_8sbFLMXG"
+  SUPABASE_URL: "",
+  SUPABASE_ANON_KEY: "",
+
+  // Lista padronizada de tamanhos (aparece como select no app).
+  // Edite à vontade — a ordem aqui é a ordem que aparece.
+  TAMANHOS: [
+    "PP Baby Look", "P Baby Look", "M Baby Look", "G Baby Look", "GG Baby Look",
+    "PP Normal", "P Normal", "M Normal", "G Normal", "GG Normal",
+    "Infantil 6 anos", "Infantil 8 anos", "Infantil 12 anos"
+  ]
 };
