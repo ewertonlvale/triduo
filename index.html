@@ -307,9 +307,9 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       </form>
       <div class="lista" style="margin-top:14px;margin-bottom:0">
         <table>
-          <thead><tr><th>Tamanho</th><th class="num">Estoque</th><th class="num">Vendidas</th><th class="num">Entregues</th><th class="num">Disponível</th></tr></thead>
+          <thead><tr><th>Tamanho</th><th class="num">Produzida</th><th class="num">Vendida</th><th class="num">Entregue</th><th class="num">Estoque</th><th class="num">Disponível</th></tr></thead>
           <tbody id="corpoEst"></tbody>
-          <tfoot><tr><td>Total</td><td class="num" id="estTot">0</td><td class="num" id="estVend">0</td><td class="num" id="estEnt">0</td><td class="num" id="estDisp">0</td></tr></tfoot>
+          <tfoot><tr><td>Total</td><td class="num" id="estTot">0</td><td class="num" id="estVend">0</td><td class="num" id="estEnt">0</td><td class="num" id="estEstoque">0</td><td class="num" id="estDisp">0</td></tr></tfoot>
         </table>
         <div class="vazio" id="vazioEst">Nenhum tamanho cadastrado ainda.</div>
       </div>
@@ -394,7 +394,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
           <div class="rel-box"><div class="r">Vendidas / Estoque</div><div class="v" style="color:var(--roxo)" id="relCamQtd">0 / 0</div></div>
         </div>
         <table class="rel">
-          <thead><tr><th>Tamanho</th><th class="n">Estoque</th><th class="n">Vendidas</th><th class="n">Entregues</th><th class="n">Disponível</th></tr></thead>
+          <thead><tr><th>Tamanho</th><th class="n">Produzida</th><th class="n">Vendida</th><th class="n">Entregue</th><th class="n">Estoque</th><th class="n">Disponível</th></tr></thead>
           <tbody id="relCamTam"></tbody>
         </table>
       </div>
@@ -642,18 +642,19 @@ function renderCamisas(){
   const vend=vendas.reduce((s,v)=>s+Number(v.quantidade||0),0);
   const entTot=vendas.reduce((s,v)=>s+(v.entregue?Number(v.quantidade||0):0),0);
   const totEstoque=estoque.reduce((s,e)=>s+Number(e.quantidade||0),0);
-  $("#camArrec").textContent=brl(arrec); $("#camFalta").textContent=brl(falta); $("#camVend").textContent=vend; $("#camEnt").textContent=entTot; $("#camDisp").textContent=(totEstoque-vend);
+  $("#camArrec").textContent=brl(arrec); $("#camFalta").textContent=brl(falta); $("#camVend").textContent=vend; $("#camEnt").textContent=entTot; $("#camDisp").textContent=(totEstoque-entTot);
   renderEstoque(); renderVendas();
 }
 function vendidasPorTam(t){ return vendas.filter(v=>(v.tamanho||"").toLowerCase()===t.toLowerCase()).reduce((s,v)=>s+Number(v.quantidade||0),0); }
 function entreguesPorTam(t){ return vendas.filter(v=>(v.tamanho||"").toLowerCase()===t.toLowerCase()&&v.entregue).reduce((s,v)=>s+Number(v.quantidade||0),0); }
 function renderEstoque(){
   const map={}; estoque.forEach(e=>{ const k=e.tamanho||"—"; map[k]=map[k]||{tamanho:k,qtd:0}; map[k].qtd+=Number(e.quantidade||0); });
-  const linhas=Object.values(map).sort((a,b)=>a.tamanho.localeCompare(b.tamanho)); let tE=0,tV=0,tEn=0,tD=0;
-  $("#corpoEst").innerHTML=linhas.map(l=>{ const vd=vendidasPorTam(l.tamanho), en=entreguesPorTam(l.tamanho), disp=l.qtd-vd; tE+=l.qtd; tV+=vd; tEn+=en; tD+=disp;
+  const linhas=Object.values(map).sort((a,b)=>a.tamanho.localeCompare(b.tamanho)); let tP=0,tV=0,tEn=0,tEst=0,tD=0;
+  $("#corpoEst").innerHTML=linhas.map(l=>{ const vd=vendidasPorTam(l.tamanho), en=entreguesPorTam(l.tamanho), estoque=l.qtd-en, disp=l.qtd-vd;
+    tP+=l.qtd; tV+=vd; tEn+=en; tEst+=estoque; tD+=disp;
     const cor=disp<=0?"color:var(--vermelho);font-weight:700":disp<=5?"color:var(--laranja);font-weight:700":"";
-    return `<tr><td><b>${esc(l.tamanho)}</b></td><td class="num">${l.qtd}</td><td class="num">${vd}</td><td class="num">${en}</td><td class="num" style="${cor}">${disp}</td></tr>`; }).join("");
-  $("#estTot").textContent=tE; $("#estVend").textContent=tV; $("#estEnt").textContent=tEn; $("#estDisp").textContent=tD; $("#vazioEst").style.display=linhas.length?"none":"block";
+    return `<tr><td><b>${esc(l.tamanho)}</b></td><td class="num">${l.qtd}</td><td class="num">${vd}</td><td class="num">${en}</td><td class="num">${estoque}</td><td class="num" style="${cor}">${disp}</td></tr>`; }).join("");
+  $("#estTot").textContent=tP; $("#estVend").textContent=tV; $("#estEnt").textContent=tEn; $("#estEstoque").textContent=tEst; $("#estDisp").textContent=tD; $("#vazioEst").style.display=linhas.length?"none":"block";
 }
 function situacao(v){ const t=Number(v.valor_total),p=Number(v.valor_pago); if(p>=t&&t>0) return "pago"; if(p>0) return "parc"; return "pend"; }
 function renderVendas(){
@@ -810,7 +811,7 @@ function renderRelatorio(){
   $("#relCamQtd").textContent=vend+" / "+totEstoque;
   const map={}; estoque.forEach(e=>{ const k=e.tamanho||"—"; map[k]=(map[k]||0)+Number(e.quantidade||0); });
   const tams=[...new Set([...Object.keys(map),...vendas.map(v=>v.tamanho)])].sort((a,b)=>a.localeCompare(b));
-  $("#relCamTam").innerHTML=tams.length?tams.map(t=>{ const q=map[t]||0, vd=vendidasPorTam(t), en=entreguesPorTam(t); return `<tr><td><b>${esc(t)}</b></td><td class="n">${q}</td><td class="n">${vd}</td><td class="n">${en}</td><td class="n">${q-vd}</td></tr>`; }).join(""):`<tr><td colspan="5" style="color:#9aa7b2">Nenhum tamanho cadastrado.</td></tr>`;
+  $("#relCamTam").innerHTML=tams.length?tams.map(t=>{ const q=map[t]||0, vd=vendidasPorTam(t), en=entreguesPorTam(t); return `<tr><td><b>${esc(t)}</b></td><td class="n">${q}</td><td class="n">${vd}</td><td class="n">${en}</td><td class="n">${q-en}</td><td class="n">${q-vd}</td></tr>`; }).join(""):`<tr><td colspan="6" style="color:#9aa7b2">Nenhum tamanho cadastrado.</td></tr>`;
 
   // pendentes
   const pend=vendas.filter(v=>Number(v.valor_total)-Number(v.valor_pago)>0.001);
