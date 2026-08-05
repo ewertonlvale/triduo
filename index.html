@@ -25,10 +25,10 @@
   .dot{width:8px; height:8px; border-radius:50%; background:#f1c40f}
   .dot.on{background:#2ecc71} .dot.off{background:#e74c3c}
   .btn-sair{background:rgba(255,255,255,.18); color:#fff; border:none; padding:4px 10px; border-radius:20px; cursor:pointer; font-size:.72rem}
-  .tabs{display:flex; gap:4px; max-width:820px; margin:0 auto; padding:0 16px}
+  .tabs{display:flex; gap:4px; max-width:1200px; margin:0 auto; padding:0 16px}
   .tabs button{flex:1; padding:12px; border:none; background:rgba(255,255,255,.15); color:#fff; font-weight:700; font-size:.95rem; border-radius:10px 10px 0 0; cursor:pointer}
   .tabs button.ativa{background:var(--cinza); color:var(--verde-esc)}
-  .wrap{max-width:820px; margin:0 auto; padding:16px}
+  .wrap{max-width:1200px; margin:0 auto; padding:16px}
   .cards{display:grid; gap:10px; margin-bottom:18px}
   .cards.c3{grid-template-columns:repeat(3,1fr)}
   .cards.c4{grid-template-columns:repeat(4,1fr)}
@@ -324,9 +324,6 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <select id="filtroPag"><option value="">Status: todos</option><option value="pago">Pago</option><option value="parc">Parcial</option><option value="pend">Pendente</option></select>
       <select id="filtroEnt"><option value="">Entrega: todas</option><option value="sim">Entregue</option><option value="nao">Não entregue</option></select>
       <select id="filtroForma"><option value="">Forma: todas</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select>
-      <button class="btn-sec" id="btnImportCam">⬆ Importar CSV</button>
-      <button class="btn-sec" id="btnExportCam">⬇ CSV</button>
-      <input type="file" id="fileCam" accept=".csv" style="display:none">
     </div>
     <div class="lista">
       <table>
@@ -461,9 +458,8 @@ function ligarEventos(){
   $("#catChips").onclick=e=>{ if(e.target.dataset.del&&confirm("Remover esta categoria?")) delFrom("categorias",e.target.dataset.del); };
   $("#corpoFin").onclick=e=>{ if(e.target.classList.contains("del")&&confirm("Excluir este lançamento?")) delFrom("lancamentos",e.target.dataset.id); };
   $("#formEst").onsubmit=addEstoque; $("#formVenda").onsubmit=addVenda;
-  $("#buscaV").oninput=renderVendas; $("#filtroPag").onchange=renderVendas; $("#btnExportCam").onclick=exportarCam;
+  $("#buscaV").oninput=renderVendas; $("#filtroPag").onchange=renderVendas;
   $("#filtroTam").onchange=renderVendas; $("#filtroEnt").onchange=renderVendas; $("#filtroForma").onchange=renderVendas;
-  $("#btnImportCam").onclick=()=>$("#fileCam").click(); $("#fileCam").onchange=importarCam;
   fillTamSelects();
   $("#corpoEst").onclick=e=>{ if(e.target.classList.contains("del")&&confirm("Remover esta entrada de estoque?")) delFrom("camisas_estoque",e.target.dataset.id); };
   $("#corpoVenda").onclick=onVendaClick;
