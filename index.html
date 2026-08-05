@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle do Tríduo — Financeiro e Camisas</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1b7a4b">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tríduo">
+<style>
+  :root{
+    --verde:#1b7a4b; --verde-esc:#125c37; --vermelho:#c0392b; --laranja:#d97706;
+    --azul:#2c3e50; --cinza:#f4f6f8; --borda:#e2e8f0; --texto:#22303c; --roxo:#6d28d9;
+  }
+  *{box-sizing:border-box}
+  body{margin:0; font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; background:var(--cinza); color:var(--texto); -webkit-text-size-adjust:100%}
+  header{background:linear-gradient(135deg,var(--verde),var(--verde-esc)); color:#fff; padding:22px 16px 0; text-align:center; position:relative}
+  header h1{margin:0; font-size:1.3rem}
+  header p{margin:4px 0 14px; opacity:.9; font-size:.85rem}
+  .status{position:absolute; top:12px; right:14px; font-size:.72rem; display:flex; align-items:center; gap:8px}
+  .status .badge{background:rgba(255,255,255,.18); padding:4px 10px; border-radius:20px; display:flex; align-items:center; gap:6px}
+  .dot{width:8px; height:8px; border-radius:50%; background:#f1c40f}
+  .dot.on{background:#2ecc71} .dot.off{background:#e74c3c}
+  .btn-sair{background:rgba(255,255,255,.18); color:#fff; border:none; padding:4px 10px; border-radius:20px; cursor:pointer; font-size:.72rem}
+  .tabs{display:flex; gap:4px; max-width:820px; margin:0 auto; padding:0 16px}
+  .tabs button{flex:1; padding:12px; border:none; background:rgba(255,255,255,.15); color:#fff; font-weight:700; font-size:.95rem; border-radius:10px 10px 0 0; cursor:pointer}
+  .tabs button.ativa{background:var(--cinza); color:var(--verde-esc)}
+  .wrap{max-width:820px; margin:0 auto; padding:16px}
+  .cards{display:grid; gap:10px; margin-bottom:18px}
+  .cards.c3{grid-template-columns:repeat(3,1fr)}
+  .cards.c4{grid-template-columns:repeat(4,1fr)}
+  .card{background:#fff; border-radius:12px; padding:14px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .card .rot{font-size:.7rem; text-transform:uppercase; letter-spacing:.5px; color:#7a8896}
+  .card .val{font-size:1.15rem; font-weight:700; margin-top:4px}
+  .card.rec .val{color:var(--verde)} .card.desp .val{color:var(--vermelho)}
+  .card.saldo .val{color:var(--azul)} .card.saldo.neg .val{color:var(--vermelho)}
+  .card.alerta .val{color:var(--laranja)} .card.info .val{color:var(--roxo)}
+  .painel{background:#fff; border-radius:12px; padding:16px; box-shadow:0 1px 3px rgba(0,0,0,.06); margin-bottom:18px}
+  .painel h2{margin:0 0 12px; font-size:1rem}
+  form{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .campo{display:flex; flex-direction:column; gap:4px}
+  .campo.full{grid-column:1 / -1}
+  label{font-size:.78rem; color:#5a6b7a; font-weight:600}
+  input,select{padding:10px; border:1px solid var(--borda); border-radius:8px; font-size:16px; width:100%; background:#fff}
+  input[type=file]{padding:7px; font-size:.85rem}
+  input:focus,select:focus{outline:2px solid var(--verde); border-color:var(--verde)}
+  .check{flex-direction:row; align-items:center; gap:8px}
+  .check input{width:auto}
+  .tipo-toggle{display:flex; gap:8px}
+  .tipo-toggle button{flex:1; padding:10px; border:2px solid var(--borda); background:#fff; border-radius:8px; font-weight:600; cursor:pointer; font-size:.9rem; color:#7a8896}
+  .tipo-toggle button.ativo-rec{border-color:var(--verde); color:var(--verde); background:#eaf6ef}
+  .tipo-toggle button.ativo-desp{border-color:var(--vermelho); color:var(--vermelho); background:#fdecea}
+  .btn-add{grid-column:1 / -1; padding:12px; border:none; border-radius:8px; background:var(--verde); color:#fff; font-size:1rem; font-weight:700; cursor:pointer}
+  .btn-add:hover{background:var(--verde-esc)}
+  .btn-add:disabled{opacity:.5; cursor:not-allowed}
+  .barra{display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:10px}
+  .barra input,.barra select{width:auto; flex:1; min-width:110px}
+  .btn-sec{padding:9px 12px; border:1px solid var(--borda); background:#fff; border-radius:8px; cursor:pointer; font-size:.85rem; font-weight:600; color:var(--azul)}
+  .btn-sec:hover{background:#eef2f5}
+  .lista{background:#fff; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.06); overflow-x:auto; margin-bottom:18px}
+  table{width:100%; border-collapse:collapse; font-size:.86rem}
+  th,td{padding:10px 9px; text-align:left; border-bottom:1px solid var(--borda); white-space:nowrap}
+  td.num,th.num{text-align:right}
+  td.valor{text-align:right; font-weight:600}
+  td.valor.rec{color:var(--verde)} td.valor.desp{color:var(--vermelho)}
+  .tag{display:inline-block; padding:2px 8px; border-radius:20px; font-size:.7rem; font-weight:600; cursor:pointer; border:none}
+  .tag.rec{background:#eaf6ef; color:var(--verde)} .tag.desp{background:#fdecea; color:var(--vermelho)}
+  .tag.pago{background:#eaf6ef; color:var(--verde)} .tag.pend{background:#fff4e5; color:var(--laranja)}
+  .tag.parc{background:#fdf6e3; color:#b7791f}
+  .tag.entr{background:#e8f0fe; color:#1a56db} .tag.nentr{background:#f1f3f5; color:#868e96}
+  .forma{display:inline-block; padding:2px 7px; border-radius:6px; font-size:.68rem; font-weight:600; background:#eef2f5; color:#5a6b7a}
+  .forma.pix{background:#e0f2f1; color:#00897b} .forma.dinheiro{background:#e8f5e9; color:#2e7d32}
+  .forma.cartao{background:#ede7f6; color:#5e35b1}
+  .chip{display:inline-flex; align-items:center; gap:6px; background:#eef2f5; border-radius:20px; padding:5px 6px 5px 12px; font-size:.82rem; margin:3px}
+  .chip small{color:#9aa7b2}
+  .chip button{background:#dbe3ea; border:none; width:20px; height:20px; border-radius:50%; cursor:pointer; color:#5a6b7a; font-weight:700}
+  .anexo{color:var(--roxo); text-decoration:none; font-size:1rem}
+  .del{background:none; border:none; color:#c0392b; cursor:pointer; font-size:1rem; padding:2px 6px; border-radius:6px}
+  .del:hover{background:#fdecea}
+  .vazio{padding:26px; text-align:center; color:#9aa7b2}
+  tfoot td{font-weight:700; background:#f7f9fb}
+  footer{text-align:center; padding:16px; color:#9aa7b2; font-size:.78rem}
+  .setup,.login{background:#fff; border-radius:12px; padding:22px; box-shadow:0 1px 3px rgba(0,0,0,.06); margin-bottom:18px}
+  .login{max-width:400px; margin:40px auto}
+  .setup h2,.login h2{margin:0 0 6px} .setup ol{padding-left:20px; line-height:1.6}
+  .setup code{background:#eef2f5; padding:1px 6px; border-radius:5px; font-size:.85rem}
+  .setup pre{background:#1e2733; color:#d6e2ea; padding:14px; border-radius:8px; overflow:auto; font-size:.68rem; position:relative}
+  .copiar{position:absolute; top:8px; right:8px; background:#2c3e50; color:#fff; border:none; padding:4px 10px; border-radius:6px; cursor:pointer; font-size:.72rem}
+  .aviso{background:#fff8e1; border:1px solid #ffe08a; border-radius:8px; padding:10px 12px; font-size:.82rem; margin:12px 0}
+  .erro{color:var(--vermelho); font-size:.85rem; margin-top:8px; min-height:18px}
+  .hide{display:none}
+  /* Modal gerenciar */
+  .modal-bg{position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:flex-start; justify-content:center; padding:24px 12px; z-index:50; overflow:auto}
+  .modal{background:#fff; border-radius:14px; max-width:460px; width:100%; padding:18px; box-shadow:0 10px 40px rgba(0,0,0,.2)}
+  .modal h3{margin:0 0 2px; font-size:1.05rem}
+  .modal .sub{color:#7a8896; font-size:.82rem; margin-bottom:12px}
+  .modal .box{background:#f7f9fb; border-radius:10px; padding:12px; margin-bottom:12px}
+  .modal .box h4{margin:0 0 8px; font-size:.85rem; color:var(--azul)}
+  .pgto-lin{display:flex; justify-content:space-between; font-size:.82rem; padding:5px 0; border-bottom:1px solid #eef2f5}
+  .modal .linha-inp{display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap}
+  .modal .linha-inp .campo{flex:1; min-width:90px}
+  .btn-fechar{background:none; border:none; font-size:1.4rem; color:#9aa7b2; cursor:pointer; float:right; line-height:1}
+  /* Relatório */
+  .rel-head{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px}
+  .rel-head h2{margin:0}
+  .rel-sec{margin-bottom:20px}
+  .rel-sec h3{font-size:.95rem; color:var(--azul); border-bottom:2px solid var(--verde); padding-bottom:5px; margin:0 0 8px}
+  .rel-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+  .rel-box{background:#f7f9fb; border-radius:10px; padding:12px; text-align:center}
+  .rel-box .r{font-size:.7rem; text-transform:uppercase; color:#7a8896; letter-spacing:.4px}
+  .rel-box .v{font-size:1.15rem; font-weight:700; margin-top:3px}
+  table.rel{width:100%; border-collapse:collapse; font-size:.86rem}
+  table.rel th,table.rel td{padding:8px 9px; border-bottom:1px solid var(--borda); text-align:left}
+  table.rel td.n,table.rel th.n{text-align:right; white-space:nowrap}
+  table.rel tfoot td{font-weight:700; background:#f7f9fb}
+  .assinaturas{display:grid; grid-template-columns:1fr 1fr; gap:40px; margin-top:40px}
+  .assina{border-top:1px solid #333; padding-top:6px; text-align:center; font-size:.82rem}
+  @media(max-width:600px){ .cards.c3,.cards.c4{grid-template-columns:1fr 1fr} form{grid-template-columns:1fr} .rel-grid{grid-template-columns:1fr} }
+  @media print{
+    body{background:#fff}
+    header{background:#fff; color:#000; padding:6px 0 0}
+    header p, .status, .tabs, .btn-sair, #btnPrint, footer{display:none !important}
+    .wrap{max-width:100%; padding:0}
+    .painel{box-shadow:none; border:1px solid #ddd}
+    .rel-box{border:1px solid #ddd}
+    .rel-sec{page-break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>⛪ Controle do Tríduo</h1>
+  <p>Financeiro e camisas · base compartilhada online</p>
+  <div class="status">
+    <span class="badge"><span class="dot" id="dot"></span><span id="statusTxt">Conectando…</span></span>
+    <button class="btn-sair hide" id="btnInstalar">⬇ Instalar app</button>
+    <button class="btn-sair hide" id="btnSair">Sair</button>
+  </div>
+  <div class="tabs hide" id="tabs">
+    <button data-tab="fin" class="ativa">💰 Financeiro</button>
+    <button data-tab="cam">👕 Camisas</button>
+    <button data-tab="rel">📊 Relatório</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- ===== SETUP ===== -->
+  <div class="setup hide" id="setup">
+    <h2>⚙️ Configuração (só na primeira vez)</h2>
+    <p>Este app guarda tudo num banco <b>Supabase</b> grátis. Siga os passos:</p>
+    <ol>
+      <li>Crie conta em <b>supabase.com</b> → <b>New project</b> (guarde a senha do banco).</li>
+      <li>Abra o <b>SQL Editor</b>, cole o código abaixo e clique em <b>Run</b>:</li>
+    </ol>
+    <pre><button class="copiar" onclick="copiar(this,'sql')">Copiar</button><code id="sql">-- Tabelas
+create table if not exists categorias (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null, tipo text not null default 'ambos',
+  created_at timestamptz default now());
+
+create table if not exists lancamentos (
+  id uuid primary key default gen_random_uuid(),
+  tipo text not null check (tipo in ('receita','despesa')),
+  descricao text, valor numeric not null, categoria text,
+  forma text, comprovante_url text,
+  data date not null default current_date, responsavel text,
+  created_at timestamptz default now());
+
+create table if not exists camisas_estoque (
+  id uuid primary key default gen_random_uuid(),
+  tamanho text not null, quantidade int not null, obs text,
+  created_at timestamptz default now());
+
+create table if not exists camisas_vendas (
+  id uuid primary key default gen_random_uuid(),
+  comprador text, tamanho text not null, quantidade int not null default 1,
+  valor_unit numeric not null default 0, valor_total numeric not null default 0,
+  valor_pago numeric not null default 0, pagamentos jsonb not null default '[]'::jsonb,
+  forma text, entregue boolean not null default false, entregue_em date, entrega_obs text,
+  comprovante_url text, responsavel text, data date not null default current_date, obs text,
+  created_at timestamptz default now());
+
+-- Segurança: só usuários logados acessam
+alter table categorias enable row level security;
+alter table lancamentos enable row level security;
+alter table camisas_estoque enable row level security;
+alter table camisas_vendas enable row level security;
+create policy "logados" on categorias for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
+create policy "logados" on lancamentos for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
+create policy "logados" on camisas_estoque for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
+create policy "logados" on camisas_vendas for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
+
+-- Armazenamento dos comprovantes
+insert into storage.buckets (id,name,public) values ('comprovantes','comprovantes',true) on conflict (id) do nothing;
+create policy "comp_ler" on storage.objects for select using (bucket_id='comprovantes');
+create policy "comp_gravar" on storage.objects for insert with check (bucket_id='comprovantes' and auth.role()='authenticated');
+create policy "comp_apagar" on storage.objects for delete using (bucket_id='comprovantes' and auth.role()='authenticated');</code></pre>
+    <ol start="3">
+      <li>Crie os usuários em <b>Authentication → Users → Add user</b> (e-mail + senha, marque <i>Auto Confirm</i>).</li>
+      <li>Vá em <b>Project Settings → API</b> e copie os dois valores:</li>
+    </ol>
+    <div class="campo"><label>Project URL</label><input type="text" id="inpUrl" placeholder="https://xxxxxxxx.supabase.co"></div>
+    <div class="campo" style="margin-top:10px"><label>Chave anon public</label><input type="text" id="inpKey" placeholder="eyJhbGciOi..."></div>
+    <div class="aviso">A chave <b>anon public</b> pode ficar no arquivo. <b>Nunca</b> use a chave <i>service_role</i>.</div>
+    <button class="btn-sec" style="background:var(--verde); color:#fff; border:none; padding:12px 18px" onclick="salvarConfig()">Salvar e conectar</button>
+  </div>
+
+  <!-- ===== LOGIN ===== -->
+  <div class="login hide" id="login">
+    <h2>🔒 Entrar</h2>
+    <p style="color:#7a8896;font-size:.85rem;margin-top:0">Use o e-mail e a senha cadastrados no Supabase.</p>
+    <form id="formLogin">
+      <div class="campo full"><label for="liEmail">E-mail</label><input type="email" id="liEmail" autocomplete="username" required></div>
+      <div class="campo full"><label for="liSenha">Senha</label><input type="password" id="liSenha" autocomplete="current-password" required></div>
+      <button type="submit" class="btn-add" id="btnEntrar">Entrar</button>
+    </form>
+    <div class="erro" id="loginErro"></div>
+  </div>
+
+  <!-- ===== ABA FINANCEIRO ===== -->
+  <div id="app-fin" class="hide">
+    <div class="cards c3">
+      <div class="card rec"><div class="rot">Receitas (c/ camisas)</div><div class="val" id="totRec">R$ 0,00</div></div>
+      <div class="card desp"><div class="rot">Despesas</div><div class="val" id="totDesp">R$ 0,00</div></div>
+      <div class="card saldo" id="cardSaldo"><div class="rot">Saldo</div><div class="val" id="totSaldo">R$ 0,00</div></div>
+    </div>
+    <div class="painel">
+      <h2>Novo lançamento</h2>
+      <form id="formFin">
+        <div class="campo full"><label>Tipo</label>
+          <div class="tipo-toggle">
+            <button type="button" id="btnRec" class="ativo-rec">Receita (entrada)</button>
+            <button type="button" id="btnDesp">Despesa (saída)</button>
+          </div></div>
+        <div class="campo full"><label for="desc">Descrição</label><input type="text" id="desc" placeholder="Ex.: Venda de espetinhos" required></div>
+        <div class="campo"><label for="valor">Valor (R$)</label><input type="number" id="valor" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
+        <div class="campo"><label for="categoria">Categoria</label><select id="categoria"><option value="">— sem categoria —</option></select></div>
+        <div class="campo"><label for="forma">Forma de pagamento</label><select id="forma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
+        <div class="campo"><label for="data">Data</label><input type="date" id="data" required></div>
+        <div class="campo"><label for="responsavel">Responsável</label><input type="text" id="responsavel" placeholder="Quem registrou"></div>
+        <div class="campo"><label for="finFile">Comprovante (opcional)</label><input type="file" id="finFile" accept="image/*,.pdf"></div>
+        <button type="submit" class="btn-add" id="btnAddFin">+ Adicionar lançamento</button>
+      </form>
+    </div>
+
+    <div class="painel" id="catPainel" style="display:none">
+      <h2>🏷️ Categorias</h2>
+      <form id="formCat" style="grid-template-columns:2fr 1fr auto">
+        <div class="campo"><label for="catNome">Nova categoria</label><input type="text" id="catNome" placeholder="Ex.: Cozinha, Bar, Doação" required></div>
+        <div class="campo"><label for="catTipo">Aplica a</label><select id="catTipo"><option value="ambos">Ambos</option><option value="receita">Receita</option><option value="despesa">Despesa</option></select></div>
+        <div class="campo" style="just-content:flex-end"><label>&nbsp;</label><button type="submit" class="btn-sec" style="background:var(--roxo);color:#fff;border:none;padding:11px 16px">Adicionar</button></div>
+      </form>
+      <div id="catChips" style="margin-top:12px"></div>
+    </div>
+
+    <div class="barra">
+      <input type="text" id="busca" placeholder="🔍 Buscar...">
+      <select id="filtroTipo"><option value="">Todos os tipos</option><option value="receita">Só receitas</option><option value="despesa">Só despesas</option></select>
+      <button class="btn-sec" id="btnCat">🏷️ Categorias</button>
+      <button class="btn-sec" id="btnExportFin">⬇ CSV</button>
+      <button class="btn-sec" id="btnReload">↻ Atualizar</button>
+    </div>
+    <div class="aviso" style="background:#eaf6ef;border-color:#bfe3cd">💡 Camisas <b>pagas</b> já entram nas Receitas. Aqui lance doações, barracas e as <b>despesas</b> (inclusive a compra das camisas).</div>
+    <div class="lista">
+      <table>
+        <thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Forma</th><th>Resp.</th><th class="num">Valor</th><th></th><th></th></tr></thead>
+        <tbody id="corpoFin"></tbody>
+        <tfoot><tr><td colspan="5">Saldo (filtro atual)</td><td class="valor" id="footFin">R$ 0,00</td><td colspan="2"></td></tr></tfoot>
+      </table>
+      <div class="vazio" id="vazioFin">Carregando…</div>
+    </div>
+  </div>
+
+  <!-- ===== ABA CAMISAS ===== -->
+  <div id="app-cam" class="hide">
+    <div class="cards c4">
+      <div class="card rec"><div class="rot">Arrecadado</div><div class="val" id="camArrec">R$ 0,00</div></div>
+      <div class="card alerta"><div class="rot">Falta receber</div><div class="val" id="camFalta">R$ 0,00</div></div>
+      <div class="card info"><div class="rot">Vendidas</div><div class="val" id="camVend">0</div></div>
+      <div class="card saldo"><div class="rot">Em estoque</div><div class="val" id="camDisp">0</div></div>
+    </div>
+    <div class="painel">
+      <h2>Estoque por tamanho</h2>
+      <p style="font-size:.82rem;color:#7a8896;margin:0 0 12px">Registre quantas camisas há de cada tamanho. O sistema desconta conforme as vendas.</p>
+      <form id="formEst">
+        <div class="campo"><label for="estTam">Tamanho</label><input type="text" id="estTam" placeholder="Ex.: P, M, G, GG, Infantil" required></div>
+        <div class="campo"><label for="estQtd">Quantidade que entrou</label><input type="number" id="estQtd" min="1" step="1" placeholder="Ex.: 50" required></div>
+        <div class="campo full"><label for="estObs">Observação (opcional)</label><input type="text" id="estObs" placeholder="Ex.: 1ª remessa da gráfica"></div>
+        <button type="submit" class="btn-add" style="background:var(--roxo)">+ Adicionar ao estoque</button>
+      </form>
+      <div class="lista" style="margin-top:14px;margin-bottom:0">
+        <table>
+          <thead><tr><th>Tamanho</th><th class="num">Estoque</th><th class="num">Vendidas</th><th class="num">Disponível</th></tr></thead>
+          <tbody id="corpoEst"></tbody>
+          <tfoot><tr><td>Total</td><td class="num" id="estTot">0</td><td class="num" id="estVend">0</td><td class="num" id="estDisp">0</td></tr></tfoot>
+        </table>
+        <div class="vazio" id="vazioEst">Nenhum tamanho cadastrado ainda.</div>
+      </div>
+    </div>
+    <div class="painel">
+      <h2>Registrar venda de camisa</h2>
+      <form id="formVenda">
+        <div class="campo full"><label for="vComprador">Comprador</label><input type="text" id="vComprador" placeholder="Nome de quem comprou"></div>
+        <div class="campo"><label for="vTam">Tamanho</label><input type="text" id="vTam" list="tams" placeholder="Ex.: M" required><datalist id="tams"></datalist></div>
+        <div class="campo"><label for="vQtd">Quantidade</label><input type="number" id="vQtd" min="1" step="1" value="1" required></div>
+        <div class="campo"><label for="vUnit">Valor unitário (R$)</label><input type="number" id="vUnit" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
+        <div class="campo"><label for="vPago">Valor pago agora (R$)</label><input type="number" id="vPago" step="0.01" min="0" placeholder="0,00" inputmode="decimal"></div>
+        <div class="campo"><label for="vForma">Forma de pagamento</label><select id="vForma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
+        <div class="campo"><label for="vFile">Comprovante (opcional)</label><input type="file" id="vFile" accept="image/*,.pdf"></div>
+        <div class="campo check"><input type="checkbox" id="vPagoInt"><label for="vPagoInt" style="font-weight:600">Pagou o valor total</label></div>
+        <div class="campo check"><input type="checkbox" id="vEntregue"><label for="vEntregue" style="font-weight:600">Já entregue</label></div>
+        <div class="campo"><label for="vResp">Responsável</label><input type="text" id="vResp" placeholder="Quem vendeu"></div>
+        <div class="campo"><label for="vData">Data</label><input type="date" id="vData" required></div>
+        <button type="submit" class="btn-add" id="btnAddVenda">+ Registrar venda</button>
+      </form>
+    </div>
+    <div class="barra">
+      <input type="text" id="buscaV" placeholder="🔍 Nome do comprador...">
+      <select id="filtroTam"><option value="">Tamanho: todos</option></select>
+      <select id="filtroPag"><option value="">Status: todos</option><option value="pago">Pago</option><option value="parc">Parcial</option><option value="pend">Pendente</option></select>
+      <select id="filtroEnt"><option value="">Entrega: todas</option><option value="sim">Entregue</option><option value="nao">Não entregue</option></select>
+      <select id="filtroForma"><option value="">Forma: todas</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select>
+      <button class="btn-sec" id="btnImportCam">⬆ Importar CSV</button>
+      <button class="btn-sec" id="btnExportCam">⬇ CSV</button>
+      <input type="file" id="fileCam" accept=".csv" style="display:none">
+    </div>
+    <div class="lista">
+      <table>
+        <thead><tr><th>Data</th><th>Comprador</th><th>Tam.</th><th class="num">Qtd</th><th class="num">Total</th><th>Forma</th><th>Pgto</th><th>Entrega</th><th></th><th></th><th></th></tr></thead>
+        <tbody id="corpoVenda"></tbody>
+      </table>
+      <div class="vazio" id="vazioVenda">Nenhuma venda registrada ainda.</div>
+    </div>
+  </div>
+
+  <!-- ===== ABA RELATÓRIO ===== -->
+  <div id="app-rel" class="hide">
+    <div class="painel">
+      <div class="rel-head">
+        <div><h2>📊 Relatório do Tríduo</h2><div style="font-size:.82rem;color:#7a8896" id="relData"></div></div>
+        <button class="btn-sec" id="btnPrint" style="background:var(--azul);color:#fff;border:none">🖨️ Imprimir / PDF</button>
+      </div>
+
+      <div class="rel-sec">
+        <h3>Resumo geral</h3>
+        <div class="rel-grid">
+          <div class="rel-box"><div class="r">Receitas totais</div><div class="v" style="color:var(--verde)" id="relRec">R$ 0,00</div></div>
+          <div class="rel-box"><div class="r">Despesas totais</div><div class="v" style="color:var(--vermelho)" id="relDesp">R$ 0,00</div></div>
+          <div class="rel-box"><div class="r">Saldo final</div><div class="v" id="relSaldo">R$ 0,00</div></div>
+        </div>
+      </div>
+
+      <div class="rel-sec">
+        <h3>Receitas por categoria</h3>
+        <table class="rel"><tbody id="relRecCat"></tbody></table>
+      </div>
+
+      <div class="rel-sec">
+        <h3>Despesas por categoria</h3>
+        <table class="rel"><tbody id="relDespCat"></tbody></table>
+      </div>
+
+      <div class="rel-sec">
+        <h3>Por forma de pagamento</h3>
+        <table class="rel">
+          <thead><tr><th>Forma</th><th class="n">Entradas</th><th class="n">Saídas</th></tr></thead>
+          <tbody id="relForma"></tbody>
+        </table>
+      </div>
+
+      <div class="rel-sec">
+        <h3>Camisas</h3>
+        <div class="rel-grid" style="margin-bottom:12px">
+          <div class="rel-box"><div class="r">Arrecadado</div><div class="v" style="color:var(--verde)" id="relCamArrec">R$ 0,00</div></div>
+          <div class="rel-box"><div class="r">Falta receber</div><div class="v" style="color:var(--laranja)" id="relCamFalta">R$ 0,00</div></div>
+          <div class="rel-box"><div class="r">Vendidas / Estoque</div><div class="v" style="color:var(--roxo)" id="relCamQtd">0 / 0</div></div>
+        </div>
+        <table class="rel">
+          <thead><tr><th>Tamanho</th><th class="n">Estoque</th><th class="n">Vendidas</th><th class="n">Disponível</th></tr></thead>
+          <tbody id="relCamTam"></tbody>
+        </table>
+      </div>
+
+      <div class="rel-sec" id="relPendSec">
+        <h3>Camisas com pagamento pendente</h3>
+        <table class="rel">
+          <thead><tr><th>Comprador</th><th>Tam.</th><th class="n">Total</th><th class="n">Falta</th></tr></thead>
+          <tbody id="relPend"></tbody>
+        </table>
+      </div>
+
+      <div class="assinaturas">
+        <div class="assina">Tesoureiro(a)</div>
+        <div class="assina">Coordenador(a) / Pároco</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL GERENCIAR PEDIDO ===== -->
+  <div class="modal-bg hide" id="modalBg"><div class="modal" id="modalBox"></div></div>
+
+  <footer>
+    Base compartilhada no Supabase · mudanças ao vivo. <a href="#" id="reconfig" style="color:#7a8896">Reconfigurar conexão</a>
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ====== COLE URL E CHAVE AQUI para todos abrirem já conectados ao banco ====== */
+const SUPABASE_URL = "";
+const SUPABASE_ANON_KEY = "";
+/* ============================================================================ */
+
+const LS="triduo_supabase_cfg";
+let sb=null, tipo="receita";
+let categorias=[], fin=[], estoque=[], vendas=[];
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+const brl=n=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const hoje=()=>new Date().toISOString().slice(0,10);
+
+function getCfg(){ if(SUPABASE_URL&&SUPABASE_ANON_KEY) return {url:SUPABASE_URL,key:SUPABASE_ANON_KEY}; try{ return JSON.parse(localStorage.getItem(LS)) }catch(e){ return null } }
+function setStatus(e,t){ const d=$("#dot"); d.className="dot"+(e==="on"?" on":e==="off"?" off":""); $("#statusTxt").textContent=t; }
+
+$$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("ativa")); b.classList.add("ativa"); const t=b.dataset.tab; $("#app-fin").classList.toggle("hide",t!=="fin"); $("#app-cam").classList.toggle("hide",t!=="cam"); $("#app-rel").classList.toggle("hide",t!=="rel"); if(t==="rel") renderRelatorio(); });
+
+async function iniciar(){
+  const cfg=getCfg();
+  if(!cfg||!cfg.url||!cfg.key){ $("#setup").classList.remove("hide"); setStatus("off","Não configurado"); return; }
+  try{ sb=supabase.createClient(cfg.url,cfg.key); }catch(e){ $("#setup").classList.remove("hide"); setStatus("off","Erro de config"); return; }
+  $("#setup").classList.add("hide");
+  ligarEventos();
+  const {data:{session}}=await sb.auth.getSession();
+  if(session) mostrarApp(); else mostrarLogin();
+  sb.auth.onAuthStateChange((_e,s)=>{ if(s) mostrarApp(); else mostrarLogin(); });
+}
+function mostrarLogin(){ setStatus("off","Faça login"); $("#login").classList.remove("hide"); $("#tabs").classList.add("hide"); $("#btnSair").classList.add("hide"); $("#app-fin").classList.add("hide"); $("#app-cam").classList.add("hide"); }
+function mostrarApp(){ $("#login").classList.add("hide"); $("#tabs").classList.remove("hide"); $("#btnSair").classList.remove("hide"); $("#app-fin").classList.remove("hide"); $("#data").value=hoje(); $("#vData").value=hoje(); carregarTudo(); assinar(); }
+
+function salvarConfig(){ const url=$("#inpUrl").value.trim().replace(/\/+$/,""), key=$("#inpKey").value.trim(); if(!url||!key){ alert("Preencha os dois campos."); return; } localStorage.setItem(LS,JSON.stringify({url,key})); location.reload(); }
+$("#reconfig").onclick=e=>{ e.preventDefault(); if(confirm("Isto limpa a conexão salva neste dispositivo. Continuar?")){ localStorage.removeItem(LS); location.reload(); } };
+function copiar(btn,id){ navigator.clipboard.writeText($("#"+id).textContent).then(()=>{ const t=btn.textContent; btn.textContent="Copiado!"; setTimeout(()=>btn.textContent=t,1500); }); }
+
+function ligarEventos(){
+  $("#formLogin").onsubmit=entrar;
+  $("#btnSair").onclick=async()=>{ await sb.auth.signOut(); };
+  $("#btnRec").onclick=()=>setTipo("receita"); $("#btnDesp").onclick=()=>setTipo("despesa");
+  $("#busca").oninput=renderFin; $("#filtroTipo").onchange=renderFin;
+  $("#btnReload").onclick=carregarTudo; $("#btnExportFin").onclick=exportarFin; $("#formFin").onsubmit=addFin;
+  $("#btnCat").onclick=()=>{ const p=$("#catPainel"); p.style.display=p.style.display==="none"?"block":"none"; };
+  $("#formCat").onsubmit=addCategoria;
+  $("#catChips").onclick=e=>{ if(e.target.dataset.del&&confirm("Remover esta categoria?")) delFrom("categorias",e.target.dataset.del); };
+  $("#corpoFin").onclick=e=>{ if(e.target.classList.contains("del")&&confirm("Excluir este lançamento?")) delFrom("lancamentos",e.target.dataset.id); };
+  $("#formEst").onsubmit=addEstoque; $("#formVenda").onsubmit=addVenda;
+  $("#buscaV").oninput=renderVendas; $("#filtroPag").onchange=renderVendas; $("#btnExportCam").onclick=exportarCam;
+  $("#filtroTam").onchange=renderVendas; $("#filtroEnt").onchange=renderVendas; $("#filtroForma").onchange=renderVendas;
+  $("#btnImportCam").onclick=()=>$("#fileCam").click(); $("#fileCam").onchange=importarCam;
+  $("#corpoEst").onclick=e=>{ if(e.target.classList.contains("del")&&confirm("Remover esta entrada de estoque?")) delFrom("camisas_estoque",e.target.dataset.id); };
+  $("#corpoVenda").onclick=onVendaClick;
+  $("#btnPrint").onclick=()=>window.print();
+}
+async function entrar(e){
+  e.preventDefault(); $("#loginErro").textContent=""; $("#btnEntrar").disabled=true; $("#btnEntrar").textContent="Entrando…";
+  const {error}=await sb.auth.signInWithPassword({email:$("#liEmail").value.trim(),password:$("#liSenha").value});
+  $("#btnEntrar").disabled=false; $("#btnEntrar").textContent="Entrar";
+  if(error){ $("#loginErro").textContent="E-mail ou senha incorretos."; return; }
+  $("#formLogin").reset();
+}
+function setTipo(t){ tipo=t; $("#btnRec").className=t==="receita"?"ativo-rec":""; $("#btnDesp").className=t==="despesa"?"ativo-desp":""; $("#btnAddFin").style.background=t==="receita"?"var(--verde)":"var(--vermelho)"; fillCatSelect(); }
+
+async function carregarTudo(){
+  setStatus("","Carregando…");
+  const [r0,r1,r2,r3]=await Promise.all([
+    sb.from("categorias").select("*").order("nome"),
+    sb.from("lancamentos").select("*").order("data",{ascending:false}).order("created_at",{ascending:false}),
+    sb.from("camisas_estoque").select("*").order("created_at",{ascending:false}),
+    sb.from("camisas_vendas").select("*").order("data",{ascending:false}).order("created_at",{ascending:false})
+  ]);
+  const err=r0.error||r1.error||r2.error||r3.error;
+  if(err){ setStatus("off","Erro ao ler"); alert("Erro: "+err.message); return; }
+  categorias=r0.data||[]; fin=r1.data||[]; estoque=r2.data||[]; vendas=r3.data||[];
+  setStatus("on","Conectado"); fillCatSelect(); renderCategorias(); renderFin(); renderCamisas(); renderRelatorio();
+}
+function assinar(){ try{ ["categorias","lancamentos","camisas_estoque","camisas_vendas"].forEach(t=> sb.channel("ch_"+t).on("postgres_changes",{event:"*",schema:"public",table:t},()=>carregarTudo()).subscribe()); }catch(e){} }
+async function delFrom(tabela,id){ const {error}=await sb.from(tabela).delete().eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
+
+async function subirComprovante(input,prefixo){
+  const file=input.files&&input.files[0]; if(!file) return null;
+  if(file.size>10*1024*1024){ alert("Comprovante muito grande (máx. 10 MB)."); throw new Error("grande"); }
+  const nome=prefixo+"/"+Date.now()+"_"+file.name.replace(/[^\w.\-]/g,"_");
+  const {error}=await sb.storage.from("comprovantes").upload(nome,file);
+  if(error){ alert("Erro ao enviar comprovante: "+error.message); throw error; }
+  return sb.storage.from("comprovantes").getPublicUrl(nome).data.publicUrl;
+}
+
+/* ---------- CATEGORIAS ---------- */
+function fillCatSelect(){
+  const sel=$("#categoria"); const atual=sel.value;
+  const opts=categorias.filter(c=>c.tipo==="ambos"||c.tipo===tipo).map(c=>c.nome);
+  sel.innerHTML='<option value="">— sem categoria —</option>'+opts.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  if(opts.includes(atual)) sel.value=atual;
+}
+async function addCategoria(e){
+  e.preventDefault();
+  const nome=$("#catNome").value.trim(); if(!nome) return;
+  if(categorias.some(c=>c.nome.toLowerCase()===nome.toLowerCase())){ alert("Essa categoria já existe."); return; }
+  const {error}=await sb.from("categorias").insert({nome,tipo:$("#catTipo").value});
+  if(error){ alert("Erro: "+error.message); return; }
+  e.target.reset(); carregarTudo();
+}
+function renderCategorias(){
+  const rot={ambos:"ambos",receita:"receita",despesa:"despesa"};
+  $("#catChips").innerHTML=categorias.length?categorias.map(c=>`<span class="chip">${esc(c.nome)} <small>(${rot[c.tipo]||"ambos"})</small> <button data-del="${c.id}" title="Remover">×</button></span>`).join(""):'<span style="color:#9aa7b2;font-size:.85rem">Nenhuma categoria ainda. Adicione acima.</span>';
+}
+
+/* ---------- FINANCEIRO ---------- */
+async function addFin(e){
+  e.preventDefault();
+  const v=parseFloat($("#valor").value);
+  if(isNaN(v)||v<=0){ alert("Informe um valor válido."); return; }
+  $("#btnAddFin").disabled=true; $("#btnAddFin").textContent="Salvando…";
+  let url=null; try{ url=await subirComprovante($("#finFile"),"financeiro"); }catch(err){ $("#btnAddFin").disabled=false; $("#btnAddFin").textContent="+ Adicionar lançamento"; return; }
+  const {error}=await sb.from("lancamentos").insert({tipo,descricao:$("#desc").value.trim(),valor:v,categoria:$("#categoria").value,forma:$("#forma").value,comprovante_url:url,data:$("#data").value,responsavel:$("#responsavel").value.trim()});
+  $("#btnAddFin").disabled=false; $("#btnAddFin").textContent="+ Adicionar lançamento";
+  if(error){ alert("Erro ao salvar: "+error.message); return; }
+  e.target.reset(); $("#data").value=hoje(); setTipo("receita"); carregarTudo();
+}
+function receitaCamisas(){ return vendas.reduce((s,v)=>s+Number(v.valor_pago||0),0); }
+function formaTag(f){ if(!f) return ""; const cls=f==="Pix"?"pix":f==="Dinheiro"?"dinheiro":f==="Cartão"?"cartao":""; return `<span class="forma ${cls}">${esc(f)}</span>`; }
+function anexo(url){ return url?`<a class="anexo" href="${url}" target="_blank" title="Ver comprovante">📎</a>`:""; }
+function renderFin(){
+  const recM=fin.filter(d=>d.tipo==="receita").reduce((s,d)=>s+Number(d.valor),0);
+  const desp=fin.filter(d=>d.tipo==="despesa").reduce((s,d)=>s+Number(d.valor),0);
+  const rec=recM+receitaCamisas();
+  $("#totRec").textContent=brl(rec); $("#totDesp").textContent=brl(desp); $("#totSaldo").textContent=brl(rec-desp);
+  $("#cardSaldo").classList.toggle("neg",(rec-desp)<0);
+  const q=$("#busca").value.toLowerCase(), ft=$("#filtroTipo").value;
+  const lista=fin.filter(d=>{ if(ft&&d.tipo!==ft) return false; if(q&&!((d.descricao||"")+" "+(d.categoria||"")+" "+(d.responsavel||"")).toLowerCase().includes(q)) return false; return true; });
+  $("#corpoFin").innerHTML=lista.map(d=>{ const s=d.tipo==="receita"?"+":"−", c=d.tipo==="receita"?"rec":"desp";
+    return `<tr><td>${fmtData(d.data)}</td><td><b>${esc(d.descricao)||"—"}</b> <span class="tag ${c}">${d.tipo==="receita"?"Rec.":"Desp."}</span></td><td>${esc(d.categoria)||"—"}</td><td>${formaTag(d.forma)||"—"}</td><td>${esc(d.responsavel)||"—"}</td><td class="valor ${c}">${s} ${brl(d.valor)}</td><td>${anexo(d.comprovante_url)}</td><td><button class="del" data-id="${d.id}">🗑</button></td></tr>`; }).join("");
+  $("#vazioFin").style.display=lista.length?"none":"block"; $("#vazioFin").textContent="Nenhum lançamento ainda.";
+  const sf=lista.reduce((s,d)=>s+(d.tipo==="receita"?Number(d.valor):-Number(d.valor)),0);
+  $("#footFin").textContent=brl(sf);
+}
+
+/* ---------- CAMISAS ---------- */
+async function addEstoque(e){
+  e.preventDefault(); const q=parseInt($("#estQtd").value);
+  if(!q||q<=0){ alert("Quantidade inválida."); return; }
+  const {error}=await sb.from("camisas_estoque").insert({tamanho:$("#estTam").value.trim(),quantidade:q,obs:$("#estObs").value.trim()});
+  if(error){ alert("Erro: "+error.message); return; } e.target.reset(); carregarTudo();
+}
+async function addVenda(e){
+  e.preventDefault();
+  const qtd=parseInt($("#vQtd").value)||1, unit=parseFloat($("#vUnit").value);
+  if(isNaN(unit)||unit<0){ alert("Valor unitário inválido."); return; }
+  const total=+(qtd*unit).toFixed(2);
+  let pago=$("#vPagoInt").checked?total:(parseFloat($("#vPago").value)||0); if(pago>total) pago=total;
+  $("#btnAddVenda").disabled=true; $("#btnAddVenda").textContent="Salvando…";
+  let url=null; try{ url=await subirComprovante($("#vFile"),"camisas"); }catch(err){ $("#btnAddVenda").disabled=false; $("#btnAddVenda").textContent="+ Registrar venda"; return; }
+  const {error}=await sb.from("camisas_vendas").insert({comprador:$("#vComprador").value.trim(),tamanho:$("#vTam").value.trim(),quantidade:qtd,valor_unit:unit,valor_total:total,valor_pago:pago,forma:$("#vForma").value,entregue:$("#vEntregue").checked,comprovante_url:url,responsavel:$("#vResp").value.trim(),data:$("#vData").value});
+  $("#btnAddVenda").disabled=false; $("#btnAddVenda").textContent="+ Registrar venda";
+  if(error){ alert("Erro ao salvar: "+error.message); return; }
+  e.target.reset(); $("#vQtd").value=1; $("#vData").value=hoje(); carregarTudo();
+}
+function renderCamisas(){
+  const tams=[...new Set([...estoque.map(e=>e.tamanho),...vendas.map(v=>v.tamanho)].filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+  $("#tams").innerHTML=tams.map(t=>`<option value="${esc(t)}">`).join("");
+  const ft=$("#filtroTam"); if(ft){ const atual=ft.value; ft.innerHTML='<option value="">Tamanho: todos</option>'+tams.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join(""); if(tams.includes(atual)) ft.value=atual; }
+  const arrec=receitaCamisas();
+  const falta=vendas.reduce((s,v)=>s+Math.max(0,Number(v.valor_total)-Number(v.valor_pago)),0);
+  const vend=vendas.reduce((s,v)=>s+Number(v.quantidade||0),0);
+  const totEstoque=estoque.reduce((s,e)=>s+Number(e.quantidade||0),0);
+  $("#camArrec").textContent=brl(arrec); $("#camFalta").textContent=brl(falta); $("#camVend").textContent=vend; $("#camDisp").textContent=(totEstoque-vend);
+  renderEstoque(); renderVendas();
+}
+function vendidasPorTam(t){ return vendas.filter(v=>(v.tamanho||"").toLowerCase()===t.toLowerCase()).reduce((s,v)=>s+Number(v.quantidade||0),0); }
+function renderEstoque(){
+  const map={}; estoque.forEach(e=>{ const k=e.tamanho||"—"; map[k]=map[k]||{tamanho:k,qtd:0}; map[k].qtd+=Number(e.quantidade||0); });
+  const linhas=Object.values(map).sort((a,b)=>a.tamanho.localeCompare(b.tamanho)); let tE=0,tV=0,tD=0;
+  $("#corpoEst").innerHTML=linhas.map(l=>{ const vd=vendidasPorTam(l.tamanho), disp=l.qtd-vd; tE+=l.qtd; tV+=vd; tD+=disp;
+    const cor=disp<=0?"color:var(--vermelho);font-weight:700":disp<=5?"color:var(--laranja);font-weight:700":"";
+    return `<tr><td><b>${esc(l.tamanho)}</b></td><td class="num">${l.qtd}</td><td class="num">${vd}</td><td class="num" style="${cor}">${disp}</td></tr>`; }).join("");
+  $("#estTot").textContent=tE; $("#estVend").textContent=tV; $("#estDisp").textContent=tD; $("#vazioEst").style.display=linhas.length?"none":"block";
+}
+function situacao(v){ const t=Number(v.valor_total),p=Number(v.valor_pago); if(p>=t&&t>0) return "pago"; if(p>0) return "parc"; return "pend"; }
+function renderVendas(){
+  const q=$("#buscaV").value.toLowerCase(), f=$("#filtroPag").value;
+  const fTam=$("#filtroTam")?$("#filtroTam").value:"", fEnt=$("#filtroEnt")?$("#filtroEnt").value:"", fForma=$("#filtroForma")?$("#filtroForma").value:"";
+  const lista=vendas.filter(v=>{ const st=situacao(v);
+    if(f&&st!==f) return false;
+    if(fTam&&(v.tamanho||"")!==fTam) return false;
+    if(fEnt==="sim"&&!v.entregue) return false; if(fEnt==="nao"&&v.entregue) return false;
+    if(fForma&&(v.forma||"")!==fForma) return false;
+    if(q&&!((v.comprador||"")+" "+(v.tamanho||"")+" "+(v.responsavel||"")).toLowerCase().includes(q)) return false; return true; });
+  $("#corpoVenda").innerHTML=lista.map(v=>{ const st=situacao(v);
+    const pagoTag=st==="pago"?`<span class="tag pago" data-act="ger" data-id="${v.id}">Pago</span>`:st==="parc"?`<span class="tag parc" data-act="ger" data-id="${v.id}">Falta ${brl(v.valor_total-v.valor_pago)}</span>`:`<span class="tag pend" data-act="ger" data-id="${v.id}">Pendente</span>`;
+    const nota=v.entrega_obs?` <span title="${esc(v.entrega_obs)}">📝</span>`:"";
+    const entTag=v.entregue?`<span class="tag entr" data-act="ger" data-id="${v.id}">Entregue</span>${nota}`:`<span class="tag nentr" data-act="ger" data-id="${v.id}">Não</span>`;
+    return `<tr><td>${fmtData(v.data)}</td><td><b>${esc(v.comprador)||"—"}</b></td><td>${esc(v.tamanho)}</td><td class="num">${v.quantidade}</td><td class="num">${brl(v.valor_total)}</td><td>${formaTag(v.forma)||"—"}</td><td>${pagoTag}</td><td>${entTag}</td><td><button class="btn-sec" style="padding:5px 9px" data-act="ger" data-id="${v.id}">⚙ Gerenciar</button></td><td>${anexo(v.comprovante_url)}</td><td><button class="del" data-id="${v.id}">🗑</button></td></tr>`; }).join("");
+  $("#vazioVenda").style.display=lista.length?"none":"block";
+}
+function onVendaClick(e){
+  const t=e.target.closest("[data-act],.del"); if(!t) return;
+  if(t.classList.contains("del")){ if(confirm("Excluir esta venda?")) delFrom("camisas_vendas",t.dataset.id); return; }
+  if(t.dataset.act==="ger") abrirGerenciar(t.dataset.id);
+}
+
+/* ---------- MODAL GERENCIAR ---------- */
+function fecharModal(){ $("#modalBg").classList.add("hide"); }
+$("#modalBg")&&($("#modalBg").onclick=e=>{ if(e.target.id==="modalBg") fecharModal(); });
+function abrirGerenciar(id){
+  const v=vendas.find(x=>x.id===id); if(!v) return;
+  const total=Number(v.valor_total), pago=Number(v.valor_pago), falta=Math.max(0,total-pago);
+  const pagtos=Array.isArray(v.pagamentos)?v.pagamentos:[];
+  const histHtml=pagtos.length?pagtos.map(p=>`<div class="pgto-lin"><span>${fmtData(p.data)} ${p.forma?"· "+esc(p.forma):""}</span><span style="font-weight:600;color:var(--verde)">${brl(p.valor)}</span></div>`).join(""):`<div style="color:#9aa7b2;font-size:.82rem">Nenhum pagamento registrado.</div>`;
+  $("#modalBox").innerHTML=`
+    <button class="btn-fechar" id="mFechar">×</button>
+    <h3>${esc(v.comprador)||"Pedido"} · ${esc(v.tamanho)}</h3>
+    <div class="sub">${v.quantidade} camisa(s) · total ${brl(total)}</div>
+
+    <div class="box">
+      <h4>💳 Pagamento</h4>
+      <div style="display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:8px">
+        <span>Pago: <b style="color:var(--verde)">${brl(pago)}</b></span>
+        <span>Falta: <b style="color:${falta>0?"var(--laranja)":"var(--verde)"}">${brl(falta)}</b></span>
+      </div>
+      ${histHtml}
+      <div class="linha-inp" style="margin-top:10px">
+        <div class="campo"><label>Registrar pagamento (R$)</label><input type="number" id="mValor" step="0.01" min="0" placeholder="${falta>0?falta.toFixed(2):"0,00"}" inputmode="decimal"></div>
+        <div class="campo"><label>Forma</label><select id="mForma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
+        <button class="btn-sec" id="mAddPg" style="background:var(--verde);color:#fff;border:none;padding:10px 14px">Dar baixa</button>
+      </div>
+      ${falta>0?`<button class="btn-sec" id="mQuitar" style="margin-top:8px;width:100%">Quitar tudo (${brl(falta)})</button>`:`<div style="margin-top:8px;color:var(--verde);font-weight:600;font-size:.85rem">✓ Totalmente pago</div>`}
+    </div>
+
+    <div class="box">
+      <h4>📦 Entrega</h4>
+      <div class="campo" style="margin-bottom:8px"><label>Observação da entrega</label><input type="text" id="mObs" value="${esc(v.entrega_obs)}" placeholder="Ex.: entregue à Maria no domingo"></div>
+      ${v.entregue?`<div style="font-size:.82rem;color:#1a56db;margin-bottom:8px">✓ Entregue${v.entregue_em?" em "+fmtData(v.entregue_em):""}</div>`:""}
+      <div style="display:flex;gap:8px">
+        ${v.entregue
+          ?`<button class="btn-sec" id="mSalvarObs" style="flex:1">Salvar observação</button><button class="btn-sec" id="mDesent" style="flex:1">Desmarcar entrega</button>`
+          :`<button class="btn-sec" id="mEntregar" style="flex:1;background:#1a56db;color:#fff;border:none">Confirmar entrega</button>`}
+      </div>
+    </div>`;
+  $("#modalBg").classList.remove("hide");
+  $("#mFechar").onclick=fecharModal;
+  $("#mAddPg").onclick=async()=>{ const val=parseFloat($("#mValor").value); if(isNaN(val)||val<=0){ alert("Informe um valor."); return; } await registrarPagamento(v,val,$("#mForma").value); };
+  const q=$("#mQuitar"); if(q) q.onclick=async()=>{ await registrarPagamento(v,falta,$("#mForma").value); };
+  const be=$("#mEntregar"); if(be) be.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim()); };
+  const bo=$("#mSalvarObs"); if(bo) bo.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim()); };
+  const bd=$("#mDesent"); if(bd) bd.onclick=async()=>{ await salvarEntrega(id,false,$("#mObs").value.trim()); };
+}
+async function registrarPagamento(v,valor,forma){
+  const total=Number(v.valor_total);
+  const novoPago=Math.min(total,Number(v.valor_pago)+valor);
+  const reg=Math.round((novoPago-Number(v.valor_pago))*100)/100;
+  const pagtos=(Array.isArray(v.pagamentos)?v.pagamentos:[]).concat([{data:hoje(),valor:reg,forma:forma||null}]);
+  const upd={valor_pago:novoPago,pagamentos:pagtos};
+  if(forma&&!v.forma) upd.forma=forma;
+  const {error}=await sb.from("camisas_vendas").update(upd).eq("id",v.id);
+  if(error){ alert("Erro: "+error.message); return; }
+  fecharModal(); await carregarTudo();
+}
+async function salvarEntrega(id,entregue,obs){
+  const upd={entregue,entrega_obs:obs||null,entregue_em:entregue?hoje():null};
+  const {error}=await sb.from("camisas_vendas").update(upd).eq("id",id);
+  if(error){ alert("Erro: "+error.message); return; }
+  fecharModal(); await carregarTudo();
+}
+
+/* ---------- RELATÓRIO ---------- */
+function renderRelatorio(){
+  if(!$("#relData")) return;
+  $("#relData").textContent="Gerado em "+new Date().toLocaleString("pt-BR");
+  const recCamisas=receitaCamisas();
+  const recM=fin.filter(d=>d.tipo==="receita").reduce((s,d)=>s+Number(d.valor),0);
+  const desp=fin.filter(d=>d.tipo==="despesa").reduce((s,d)=>s+Number(d.valor),0);
+  const rec=recM+recCamisas;
+  $("#relRec").textContent=brl(rec); $("#relDesp").textContent=brl(desp);
+  $("#relSaldo").textContent=brl(rec-desp); $("#relSaldo").style.color=(rec-desp)<0?"var(--vermelho)":"var(--azul)";
+
+  // por categoria
+  const porCat=tp=>{ const m={}; fin.filter(d=>d.tipo===tp).forEach(d=>{ const k=d.categoria||"(sem categoria)"; m[k]=(m[k]||0)+Number(d.valor); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
+  const recCats=porCat("receita"); if(recCamisas>0) recCats.push(["👕 Camisas (vendas pagas)",recCamisas]);
+  recCats.sort((a,b)=>b[1]-a[1]);
+  const linhaCat=(arr,tot)=> (arr.length?arr.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${brl(v)}</td></tr>`).join(""):`<tr><td colspan="2" style="color:#9aa7b2">Nada lançado.</td></tr>`)
+    +`<tr><td style="font-weight:700">Total</td><td class="n" style="font-weight:700">${brl(tot)}</td></tr>`;
+  $("#relRecCat").innerHTML=linhaCat(recCats,rec);
+  $("#relDespCat").innerHTML=linhaCat(porCat("despesa"),desp);
+
+  // por forma
+  const formas=["Dinheiro","Pix","Cartão","Outro","(sem informar)"];
+  const key=f=>f||"(sem informar)";
+  const ent={}, sai={};
+  fin.forEach(d=>{ const t=d.tipo==="receita"?ent:sai; const k=key(d.forma); t[k]=(t[k]||0)+Number(d.valor); });
+  vendas.forEach(v=>{ if(Number(v.valor_pago)>0){ const k=key(v.forma); ent[k]=(ent[k]||0)+Number(v.valor_pago); } });
+  const usadas=formas.filter(f=>ent[f]||sai[f]);
+  $("#relForma").innerHTML=(usadas.length?usadas.map(f=>`<tr><td>${f}</td><td class="n">${brl(ent[f]||0)}</td><td class="n">${brl(sai[f]||0)}</td></tr>`).join(""):`<tr><td colspan="3" style="color:#9aa7b2">Sem lançamentos.</td></tr>`)
+    +`<tr><td style="font-weight:700">Total</td><td class="n" style="font-weight:700">${brl(Object.values(ent).reduce((s,x)=>s+x,0))}</td><td class="n" style="font-weight:700">${brl(Object.values(sai).reduce((s,x)=>s+x,0))}</td></tr>`;
+
+  // camisas
+  const falta=vendas.reduce((s,v)=>s+Math.max(0,Number(v.valor_total)-Number(v.valor_pago)),0);
+  const vend=vendas.reduce((s,v)=>s+Number(v.quantidade||0),0);
+  const totEstoque=estoque.reduce((s,e)=>s+Number(e.quantidade||0),0);
+  $("#relCamArrec").textContent=brl(recCamisas); $("#relCamFalta").textContent=brl(falta);
+  $("#relCamQtd").textContent=vend+" / "+totEstoque;
+  const map={}; estoque.forEach(e=>{ const k=e.tamanho||"—"; map[k]=(map[k]||0)+Number(e.quantidade||0); });
+  const tams=[...new Set([...Object.keys(map),...vendas.map(v=>v.tamanho)])].sort((a,b)=>a.localeCompare(b));
+  $("#relCamTam").innerHTML=tams.length?tams.map(t=>{ const q=map[t]||0, vd=vendidasPorTam(t); return `<tr><td><b>${esc(t)}</b></td><td class="n">${q}</td><td class="n">${vd}</td><td class="n">${q-vd}</td></tr>`; }).join(""):`<tr><td colspan="4" style="color:#9aa7b2">Nenhum tamanho cadastrado.</td></tr>`;
+
+  // pendentes
+  const pend=vendas.filter(v=>Number(v.valor_total)-Number(v.valor_pago)>0.001);
+  $("#relPendSec").style.display=pend.length?"block":"none";
+  $("#relPend").innerHTML=pend.map(v=>`<tr><td>${esc(v.comprador)||"—"}</td><td>${esc(v.tamanho)}</td><td class="n">${brl(v.valor_total)}</td><td class="n" style="color:var(--laranja);font-weight:600">${brl(v.valor_total-v.valor_pago)}</td></tr>`).join("");
+}
+
+/* ---------- IMPORTAR CAMISAS (CSV) ---------- */
+function semAcento(s){ return (s||"").toString().trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,""); }
+function dividir(ln,sep){ const out=[]; let cur="",dentro=false; for(let i=0;i<ln.length;i++){ const ch=ln[i]; if(ch==='"'){ if(dentro&&ln[i+1]==='"'){cur+='"';i++} else dentro=!dentro; } else if(ch===sep&&!dentro){ out.push(cur); cur=""; } else cur+=ch; } out.push(cur); return out.map(s=>s.trim()); }
+function normData(s){ s=(s||"").trim(); if(!s) return hoje(); let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if(m){ let a=m[3]; if(a.length===2)a="20"+a; return a+"-"+m[2].padStart(2,"0")+"-"+m[1].padStart(2,"0"); } if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10); return hoje(); }
+function numBR(s){ s=String(s??"").replace(/[^\d,.\-]/g,""); if(s.indexOf(",")>=0){ s=s.replace(/\./g,"").replace(",","."); } const n=parseFloat(s); return isNaN(n)?0:n; }
+function parseCamCSV(txt){
+  txt=txt.replace(/^﻿/,"").trim(); const linhas=txt.split(/\r?\n/); if(linhas.length<2) return [];
+  const sep=(linhas[0].split(";").length>=linhas[0].split(",").length)?";":",";
+  const cab=dividir(linhas[0],sep).map(semAcento);
+  const idx=al=>{ for(const a of al){ const i=cab.indexOf(a); if(i>=0) return i; } return -1; };
+  const iC=idx(["comprador","nome","cliente","nome do comprador"]), iT=idx(["tamanho","tam"]),
+    iQ=idx(["quantidade","qtd","quant","qtde"]), iU=idx(["valor_unit","valor unitario","unitario","preco","preco unitario"]),
+    iTot=idx(["valor_total","total","valor"]), iP=idx(["valor_pago","pago","valor pago"]),
+    iF=idx(["forma","forma_pagamento","forma de pagamento","pagamento"]), iE=idx(["entregue","entrega"]),
+    iD=idx(["data","data da venda"]), iR=idx(["responsavel","vendedor","resp"]),
+    iO=idx(["entrega_obs","obs","observacao","observacoes","observação"]), iS=idx(["situacao","status"]);
+  const out=[];
+  for(let k=1;k<linhas.length;k++){ if(!linhas[k].trim()) continue; const c=dividir(linhas[k],sep); const g=i=>i>=0?(c[i]||"").trim():"";
+    const comprador=g(iC), tam=g(iT); if(!comprador&&!tam) continue;
+    const qtd=Math.max(1,parseInt(g(iQ))||1);
+    let unit=numBR(g(iU)); let total=g(iTot)?numBR(g(iTot)):+(qtd*unit).toFixed(2);
+    if(!unit&&total) unit=+(total/qtd).toFixed(2);
+    let pago; if(iP>=0&&g(iP)!=="") pago=numBR(g(iP)); else { const st=semAcento(g(iS)); pago=/pag|quit|sim|ok/.test(st)?total:0; }
+    if(pago>total) pago=total; if(pago<0) pago=0;
+    const ent=/^(sim|s|true|1|x|entregue?)$/.test(semAcento(g(iE)));
+    const forma=g(iF)||null, data=normData(g(iD));
+    out.push({ comprador:comprador||null, tamanho:tam||"—", quantidade:qtd, valor_unit:unit, valor_total:total, valor_pago:pago,
+      pagamentos: pago>0?[{data,valor:pago,forma}]:[], forma, entregue:ent, entregue_em:ent?data:null,
+      entrega_obs:g(iO)||null, responsavel:g(iR)||null, data }); }
+  return out;
+}
+async function importarCam(e){
+  const f=e.target.files&&e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=async()=>{
+    try{
+      const regs=parseCamCSV(r.result);
+      if(!regs.length){ alert("Nenhuma linha válida encontrada. Confira se a primeira linha tem os cabeçalhos (comprador, tamanho, ...)."); e.target.value=""; return; }
+      const totalPreview=regs.reduce((s,v)=>s+v.valor_total,0);
+      if(!confirm("Importar "+regs.length+" pedido(s) de camisa (total "+brl(totalPreview)+")?\nEles serão ADICIONADOS aos já existentes.")){ e.target.value=""; return; }
+      for(let i=0;i<regs.length;i+=400){ const {error}=await sb.from("camisas_vendas").insert(regs.slice(i,i+400)); if(error){ alert("Erro ao importar: "+error.message); e.target.value=""; carregarTudo(); return; } }
+      alert("✓ Importado com sucesso: "+regs.length+" pedido(s).");
+      e.target.value=""; carregarTudo();
+    }catch(err){ alert("Erro ao ler o CSV: "+err.message); e.target.value=""; }
+  };
+  r.readAsText(f,"UTF-8");
+}
+
+/* ---------- EXPORTS ---------- */
+function baixarCSV(nome,cab,linhas){ const csv="﻿"+cab.join(";")+"\n"+linhas.join("\n"); const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})); a.download=nome; a.click(); }
+function exportarFin(){ if(!fin.length){ alert("Nada para exportar."); return; } baixarCSV("triduo-financeiro-"+hoje()+".csv",["data","tipo","descricao","categoria","forma","responsavel","valor","comprovante"],fin.map(d=>[d.data,d.tipo,d.descricao,d.categoria,d.forma,d.responsavel,Number(d.valor).toFixed(2),d.comprovante_url].map(campoCSV).join(";"))); }
+function exportarCam(){ if(!vendas.length){ alert("Nada para exportar."); return; } baixarCSV("triduo-camisas-"+hoje()+".csv",["data","comprador","tamanho","quantidade","valor_unit","valor_total","valor_pago","falta","forma","situacao","entregue","entregue_em","entrega_obs","responsavel","comprovante"],vendas.map(v=>[v.data,v.comprador,v.tamanho,v.quantidade,Number(v.valor_unit).toFixed(2),Number(v.valor_total).toFixed(2),Number(v.valor_pago).toFixed(2),Math.max(0,Number(v.valor_total)-Number(v.valor_pago)).toFixed(2),v.forma,situacao(v),v.entregue?"sim":"não",v.entregue_em||"",v.entrega_obs||"",v.responsavel,v.comprovante_url].map(campoCSV).join(";"))); }
+function campoCSV(v){ v=String(v??""); return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+function fmtData(iso){ if(!iso) return "—"; const [a,m,d]=iso.split("-"); return `${d}/${m}/${a.slice(2)}`; }
+function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])) }
+
+iniciar();
+
+/* ---------- PWA: instalação e service worker ---------- */
+if("serviceWorker" in navigator){ window.addEventListener("load",()=>{ navigator.serviceWorker.register("sw.js").catch(()=>{}); }); }
+let promptInstalar=null;
+window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); promptInstalar=e; const b=$("#btnInstalar"); if(b) b.classList.remove("hide"); });
+$("#btnInstalar")&&($("#btnInstalar").onclick=async()=>{ if(!promptInstalar) return; promptInstalar.prompt(); await promptInstalar.userChoice; promptInstalar=null; $("#btnInstalar").classList.add("hide"); });
+window.addEventListener("appinstalled",()=>{ promptInstalar=null; const b=$("#btnInstalar"); if(b) b.classList.add("hide"); });
+</script>
+</body>
+</html>
