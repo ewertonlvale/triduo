@@ -437,6 +437,7 @@ const LS="triduo_supabase_cfg";
 let sb=null, tipo="receita";
 let categorias=[], fin=[], estoque=[], vendas=[];
 let editFinId=null;
+let _appIniciado=false, _inscrito=false, _carregando=false, _recarregar=false;
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const brl=n=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const hoje=()=>new Date().toISOString().slice(0,10);
@@ -458,8 +459,13 @@ async function iniciar(){
   }catch(e){ mostrarLogin(); }
   try{ sb.auth.onAuthStateChange((_e,s)=>{ if(s) mostrarApp(); else mostrarLogin(); }); }catch(e){}
 }
-function mostrarLogin(){ setStatus("off","Faça login"); $("#login").classList.remove("hide"); $("#tabs").classList.add("hide"); $("#btnSair").classList.add("hide"); $("#app-fin").classList.add("hide"); $("#app-cam").classList.add("hide"); }
-function mostrarApp(){ $("#login").classList.add("hide"); $("#tabs").classList.remove("hide"); $("#btnSair").classList.remove("hide"); $("#app-fin").classList.remove("hide"); $("#data").value=hoje(); $("#vData").value=hoje(); carregarTudo(); assinar(); }
+function mostrarLogin(){ setStatus("off","Faça login"); $("#login").classList.remove("hide"); $("#tabs").classList.add("hide"); $("#btnSair").classList.add("hide"); $("#app-fin").classList.add("hide"); $("#app-cam").classList.add("hide"); $("#app-rel").classList.add("hide"); }
+function mostrarApp(){
+  $("#login").classList.add("hide"); $("#tabs").classList.remove("hide"); $("#btnSair").classList.remove("hide"); $("#app-fin").classList.remove("hide");
+  if(_appIniciado) return;            // evita reinicializar a cada evento de login (não empilha assinaturas)
+  _appIniciado=true;
+  $("#data").value=hoje(); $("#vData").value=hoje(); carregarTudo(); assinar();
+}
 
 function salvarConfig(){ const url=$("#inpUrl").value.trim().replace(/\/+$/,""), key=$("#inpKey").value.trim(); if(!url||!key){ alert("Preencha os dois campos."); return; } localStorage.setItem(LS,JSON.stringify({url,key})); location.reload(); }
 $("#reconfig").onclick=e=>{ e.preventDefault(); if(confirm("Isto limpa a conexão salva neste dispositivo. Continuar?")){ localStorage.removeItem(LS); location.reload(); } };
@@ -467,7 +473,7 @@ function copiar(btn,id){ navigator.clipboard.writeText($("#"+id).textContent).th
 
 function ligarEventos(){
   $("#formLogin").onsubmit=entrar;
-  $("#btnSair").onclick=async()=>{ await sb.auth.signOut(); };
+  $("#btnSair").onclick=async()=>{ try{ await sb.auth.signOut(); }catch(e){} location.reload(); };
   $("#btnRec").onclick=()=>setTipo("receita"); $("#btnDesp").onclick=()=>setTipo("despesa");
   $("#busca").oninput=renderFin; $("#filtroTipo").onchange=renderFin;
   $("#btnReload").onclick=carregarTudo; $("#btnExportFin").onclick=exportarFin; $("#formFin").onsubmit=addFin;
@@ -501,19 +507,24 @@ function fillTamSelects(){
 function setTipo(t){ tipo=t; $("#btnRec").className=t==="receita"?"ativo-rec":""; $("#btnDesp").className=t==="despesa"?"ativo-desp":""; $("#btnAddFin").style.background=t==="receita"?"var(--verde)":"var(--vermelho)"; fillCatSelect(); }
 
 async function carregarTudo(){
-  setStatus("","Carregando…");
-  const [r0,r1,r2,r3]=await Promise.all([
-    sb.from("categorias").select("*").order("nome"),
-    sb.from("lancamentos").select("*").order("data",{ascending:false}).order("created_at",{ascending:false}),
-    sb.from("camisas_estoque").select("*").order("created_at",{ascending:false}),
-    sb.from("camisas_vendas").select("*").order("data",{ascending:false}).order("created_at",{ascending:false})
-  ]);
-  const err=r0.error||r1.error||r2.error||r3.error;
-  if(err){ setStatus("off","Erro ao ler"); alert("Erro: "+err.message); return; }
-  categorias=r0.data||[]; fin=r1.data||[]; estoque=r2.data||[]; vendas=r3.data||[];
-  setStatus("on","Conectado"); fillCatSelect(); renderCategorias(); renderFin(); renderCamisas(); renderRelatorio();
+  if(_carregando){ _recarregar=true; return; }   // coalesce: não sobrepõe cargas nem enfileira rajadas do tempo real
+  _carregando=true;
+  try{
+    setStatus("","Carregando…");
+    const [r0,r1,r2,r3]=await Promise.all([
+      sb.from("categorias").select("*").order("nome"),
+      sb.from("lancamentos").select("*").order("data",{ascending:false}).order("created_at",{ascending:false}),
+      sb.from("camisas_estoque").select("*").order("created_at",{ascending:false}),
+      sb.from("camisas_vendas").select("*").order("data",{ascending:false}).order("created_at",{ascending:false})
+    ]);
+    const err=r0.error||r1.error||r2.error||r3.error;
+    if(err){ setStatus("off","Erro ao ler"); console.error("Erro ao ler:",err.message); return; }
+    categorias=r0.data||[]; fin=r1.data||[]; estoque=r2.data||[]; vendas=r3.data||[];
+    setStatus("on","Conectado"); fillCatSelect(); renderCategorias(); renderFin(); renderCamisas(); renderRelatorio();
+  }catch(e){ setStatus("off","Erro"); console.error(e); }
+  finally{ _carregando=false; if(_recarregar){ _recarregar=false; carregarTudo(); } }
 }
-function assinar(){ try{ ["categorias","lancamentos","camisas_estoque","camisas_vendas"].forEach(t=> sb.channel("ch_"+t).on("postgres_changes",{event:"*",schema:"public",table:t},()=>carregarTudo()).subscribe()); }catch(e){} }
+function assinar(){ if(_inscrito) return; _inscrito=true; try{ ["categorias","lancamentos","camisas_estoque","camisas_vendas"].forEach(t=> sb.channel("ch_"+t).on("postgres_changes",{event:"*",schema:"public",table:t},()=>carregarTudo()).subscribe()); }catch(e){} }
 async function delFrom(tabela,id){ const {error}=await sb.from(tabela).delete().eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
 
 async function subirComprovante(input,prefixo){
