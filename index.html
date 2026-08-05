@@ -409,10 +409,12 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
 <script>
-/* ====== COLE URL E CHAVE AQUI para todos abrirem já conectados ao banco ====== */
-const SUPABASE_URL = "";
-const SUPABASE_ANON_KEY = "";
+/* ====== As chaves ficam no arquivo config.js (não precisa mexer aqui) ====== */
+const _CFG = (typeof window!=="undefined" && window.TRIDUO_CONFIG) ? window.TRIDUO_CONFIG : {};
+const SUPABASE_URL = _CFG.SUPABASE_URL || "";
+const SUPABASE_ANON_KEY = _CFG.SUPABASE_ANON_KEY || "";
 /* ============================================================================ */
 
 const LS="triduo_supabase_cfg";
