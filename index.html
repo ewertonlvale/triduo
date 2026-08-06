@@ -142,6 +142,7 @@
   </div>
   <div class="tabs hide" id="tabs">
     <button data-tab="fin" class="ativa">💰 Financeiro</button>
+    <button data-tab="tri">⛪ Tríduo</button>
     <button data-tab="cam">👕 Camisas</button>
     <button data-tab="rel">📊 Relatório</button>
   </div>
@@ -225,7 +226,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
   <!-- ===== ABA FINANCEIRO ===== -->
   <div id="app-fin" class="hide">
     <div class="cards c3">
-      <div class="card rec"><div class="rot">Receitas (c/ camisas)</div><div class="val" id="totRec">R$ 0,00</div></div>
+      <div class="card rec"><div class="rot">Receitas (tudo)</div><div class="val" id="totRec">R$ 0,00</div></div>
       <div class="card desp"><div class="rot">Despesas</div><div class="val" id="totDesp">R$ 0,00</div></div>
       <div class="card saldo" id="cardSaldo"><div class="rot">Saldo</div><div class="val" id="totSaldo">R$ 0,00</div></div>
     </div>
@@ -280,6 +281,47 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <tfoot><tr><td colspan="5">Saldo (filtro atual)</td><td class="valor" id="footFin">R$ 0,00</td><td colspan="3"></td></tr></tfoot>
       </table>
       <div class="vazio" id="vazioFin">Carregando…</div>
+    </div>
+  </div>
+
+  <!-- ===== ABA TRÍDUO ===== -->
+  <div id="app-tri" class="hide">
+    <div class="cards c3">
+      <div class="card rec"><div class="rot">Arrecadado no tríduo</div><div class="val" id="triTotal">R$ 0,00</div></div>
+      <div class="card info"><div class="rot">Lançamentos</div><div class="val" id="triQtd">0</div></div>
+      <div class="card saldo"><div class="rot">Melhor noite</div><div class="val" id="triTop" style="font-size:.95rem">—</div></div>
+    </div>
+    <button class="btn-add" id="btnNovoTri" style="margin:0 0 14px">➕ Novo lançamento</button>
+    <div class="painel hide" id="painelTri">
+      <h2>Novo lançamento do tríduo</h2>
+      <form id="formTri">
+        <div class="campo"><label for="triNoite">Noite</label><select id="triNoite" required></select></div>
+        <div class="campo"><label for="triGrupo">Grupo</label><select id="triGrupo" required></select></div>
+        <div class="campo full"><label for="triDesc">Descrição (opcional)</label><input type="text" id="triDesc" placeholder="Ex.: Venda de caldos"></div>
+        <div class="campo"><label for="triValor">Valor (R$)</label><input type="number" id="triValor" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
+        <div class="campo"><label for="triForma">Forma de pagamento</label><select id="triForma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
+        <div class="campo"><label for="triResp">Responsável</label><input type="text" id="triResp" placeholder="Quem registrou"></div>
+        <div class="campo"><label for="triData">Data</label><input type="date" id="triData" required></div>
+        <button type="submit" class="btn-add" id="btnAddTri">+ Adicionar lançamento</button>
+        <button type="button" class="btn-add hide" id="btnCancelTri" style="background:#7a8896">Cancelar edição</button>
+      </form>
+    </div>
+    <div class="painel">
+      <h2>Resumo por noite e grupo</h2>
+      <div class="lista" id="triMatrizWrap" style="margin:0"></div>
+    </div>
+    <div class="barra">
+      <input type="text" id="triBusca" placeholder="🔍 Buscar...">
+      <select id="triFiltroNoite"><option value="">Noite: todas</option></select>
+      <select id="triFiltroGrupo"><option value="">Grupo: todos</option></select>
+    </div>
+    <div class="lista">
+      <table>
+        <thead><tr><th>Data</th><th>Noite</th><th>Grupo</th><th>Descrição</th><th>Forma</th><th>Resp.</th><th class="num">Valor</th><th></th><th></th></tr></thead>
+        <tbody id="triCorpo"></tbody>
+        <tfoot><tr><td colspan="6">Total (filtro atual)</td><td class="valor" id="triFoot">R$ 0,00</td><td colspan="2"></td></tr></tfoot>
+      </table>
+      <div class="vazio" id="triVazio">Nenhum lançamento ainda.</div>
     </div>
   </div>
 
@@ -431,12 +473,14 @@ const SUPABASE_URL = _CFG.SUPABASE_URL || "";
 const SUPABASE_ANON_KEY = _CFG.SUPABASE_ANON_KEY || "";
 const TAMANHOS = (Array.isArray(_CFG.TAMANHOS) && _CFG.TAMANHOS.length) ? _CFG.TAMANHOS
   : ["PP Baby Look","P Baby Look","M Baby Look","G Baby Look","GG Baby Look","PP Normal","P Normal","M Normal","G Normal","GG Normal","Infantil 6 anos","Infantil 8 anos","Infantil 12 anos"];
+const NOITES = (Array.isArray(_CFG.NOITES) && _CFG.NOITES.length) ? _CFG.NOITES : ["1ª Noite","2ª Noite","3ª Noite","4ª Noite","Missa"];
+const GRUPOS_TRIDUO = (Array.isArray(_CFG.GRUPOS_TRIDUO) && _CFG.GRUPOS_TRIDUO.length) ? _CFG.GRUPOS_TRIDUO : ["Comidas e Bebidas","Bazar","Leilão","Filipetas","Oferta"];
 /* ============================================================================ */
 
 const LS="triduo_supabase_cfg";
 let sb=null, tipo="receita";
-let categorias=[], fin=[], estoque=[], vendas=[];
-let editFinId=null;
+let categorias=[], fin=[], estoque=[], vendas=[], triduo=[];
+let editFinId=null, editTriId=null;
 let _appIniciado=false, _inscrito=false, _carregando=false, _recarregar=false;
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const brl=n=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
@@ -445,7 +489,7 @@ const hoje=()=>new Date().toISOString().slice(0,10);
 function getCfg(){ if(SUPABASE_URL&&SUPABASE_ANON_KEY) return {url:SUPABASE_URL,key:SUPABASE_ANON_KEY}; try{ return JSON.parse(localStorage.getItem(LS)) }catch(e){ return null } }
 function setStatus(e,t){ const d=$("#dot"); d.className="dot"+(e==="on"?" on":e==="off"?" off":""); $("#statusTxt").textContent=t; }
 
-$$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("ativa")); b.classList.add("ativa"); const t=b.dataset.tab; $("#app-fin").classList.toggle("hide",t!=="fin"); $("#app-cam").classList.toggle("hide",t!=="cam"); $("#app-rel").classList.toggle("hide",t!=="rel"); if(t==="rel") renderRelatorio(); });
+$$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("ativa")); b.classList.add("ativa"); const t=b.dataset.tab; $("#app-fin").classList.toggle("hide",t!=="fin"); $("#app-tri").classList.toggle("hide",t!=="tri"); $("#app-cam").classList.toggle("hide",t!=="cam"); $("#app-rel").classList.toggle("hide",t!=="rel"); if(t==="rel") renderRelatorio(); if(t==="tri") renderTriduo(); });
 
 async function iniciar(){
   const cfg=getCfg();
@@ -459,12 +503,12 @@ async function iniciar(){
   }catch(e){ mostrarLogin(); }
   try{ sb.auth.onAuthStateChange((_e,s)=>{ if(s) mostrarApp(); else mostrarLogin(); }); }catch(e){}
 }
-function mostrarLogin(){ setStatus("off","Faça login"); $("#login").classList.remove("hide"); $("#tabs").classList.add("hide"); $("#btnSair").classList.add("hide"); $("#app-fin").classList.add("hide"); $("#app-cam").classList.add("hide"); $("#app-rel").classList.add("hide"); }
+function mostrarLogin(){ setStatus("off","Faça login"); $("#login").classList.remove("hide"); $("#tabs").classList.add("hide"); $("#btnSair").classList.add("hide"); $("#app-fin").classList.add("hide"); $("#app-tri").classList.add("hide"); $("#app-cam").classList.add("hide"); $("#app-rel").classList.add("hide"); }
 function mostrarApp(){
   $("#login").classList.add("hide"); $("#tabs").classList.remove("hide"); $("#btnSair").classList.remove("hide"); $("#app-fin").classList.remove("hide");
   if(_appIniciado) return;            // evita reinicializar a cada evento de login (não empilha assinaturas)
   _appIniciado=true;
-  $("#data").value=hoje(); $("#vData").value=hoje(); carregarTudo(); assinar();
+  $("#data").value=hoje(); $("#vData").value=hoje(); $("#triData").value=hoje(); carregarTudo(); assinar();
 }
 
 function salvarConfig(){ const url=$("#inpUrl").value.trim().replace(/\/+$/,""), key=$("#inpKey").value.trim(); if(!url||!key){ alert("Preencha os dois campos."); return; } localStorage.setItem(LS,JSON.stringify({url,key})); location.reload(); }
@@ -492,6 +536,13 @@ function ligarEventos(){
   $("#corpoEst").onclick=e=>{ if(e.target.classList.contains("del")&&confirm("Remover esta entrada de estoque?")) delFrom("camisas_estoque",e.target.dataset.id); };
   $("#corpoVenda").onclick=onVendaClick;
   $("#btnPrint").onclick=()=>window.print();
+  // Tríduo
+  $("#formTri").onsubmit=addTri;
+  $("#btnNovoTri").onclick=()=>$("#painelTri").classList.toggle("hide");
+  $("#btnCancelTri").onclick=cancelarEdicaoTri;
+  $("#triBusca").oninput=renderTriduo; $("#triFiltroNoite").onchange=renderTriduo; $("#triFiltroGrupo").onchange=renderTriduo;
+  $("#triCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir este lançamento?")) delFrom("triduo_lancamentos",t.dataset.id); } else if(t.dataset.edit){ editarTri(t.dataset.edit); } };
+  fillTriSelects();
 }
 async function entrar(e){
   e.preventDefault(); $("#loginErro").textContent=""; $("#btnEntrar").disabled=true; $("#btnEntrar").textContent="Entrando…";
@@ -511,20 +562,21 @@ async function carregarTudo(){
   _carregando=true;
   try{
     setStatus("","Carregando…");
-    const [r0,r1,r2,r3]=await Promise.all([
+    const [r0,r1,r2,r3,r4]=await Promise.all([
       sb.from("categorias").select("*").order("nome"),
       sb.from("lancamentos").select("*").order("data",{ascending:false}).order("created_at",{ascending:false}),
       sb.from("camisas_estoque").select("*").order("created_at",{ascending:false}),
-      sb.from("camisas_vendas").select("*").order("data",{ascending:false}).order("created_at",{ascending:false})
+      sb.from("camisas_vendas").select("*").order("data",{ascending:false}).order("created_at",{ascending:false}),
+      sb.from("triduo_lancamentos").select("*").order("data",{ascending:false}).order("created_at",{ascending:false})
     ]);
-    const err=r0.error||r1.error||r2.error||r3.error;
+    const err=r0.error||r1.error||r2.error||r3.error||r4.error;
     if(err){ setStatus("off","Erro ao ler"); console.error("Erro ao ler:",err.message); return; }
-    categorias=r0.data||[]; fin=r1.data||[]; estoque=r2.data||[]; vendas=r3.data||[];
-    setStatus("on","Conectado"); fillCatSelect(); renderCategorias(); renderFin(); renderCamisas(); renderRelatorio();
+    categorias=r0.data||[]; fin=r1.data||[]; estoque=r2.data||[]; vendas=r3.data||[]; triduo=r4.data||[];
+    setStatus("on","Conectado"); fillCatSelect(); renderCategorias(); renderFin(); renderCamisas(); renderRelatorio(); renderTriduo();
   }catch(e){ setStatus("off","Erro"); console.error(e); }
   finally{ _carregando=false; if(_recarregar){ _recarregar=false; carregarTudo(); } }
 }
-function assinar(){ if(_inscrito) return; _inscrito=true; try{ ["categorias","lancamentos","camisas_estoque","camisas_vendas"].forEach(t=> sb.channel("ch_"+t).on("postgres_changes",{event:"*",schema:"public",table:t},()=>carregarTudo()).subscribe()); }catch(e){} }
+function assinar(){ if(_inscrito) return; _inscrito=true; try{ ["categorias","lancamentos","camisas_estoque","camisas_vendas","triduo_lancamentos"].forEach(t=> sb.channel("ch_"+t).on("postgres_changes",{event:"*",schema:"public",table:t},()=>carregarTudo()).subscribe()); }catch(e){} }
 async function delFrom(tabela,id){ const {error}=await sb.from(tabela).delete().eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
 
 async function subirComprovante(input,prefixo){
@@ -603,6 +655,7 @@ function saldoCaixaDinheiro(){
     if(pg.length){ pg.forEach(p=>{ if(isDin(p.forma)) caixa+=Number(p.valor)||0; }); }
     else if(Number(v.valor_pago)>0 && isDin(v.forma)){ caixa+=Number(v.valor_pago); }
   });
+  triduo.forEach(t=>{ if(isDin(t.forma)) caixa+=Number(t.valor)||0; });
   return Math.round(caixa*100)/100;
 }
 function formaTag(f){ if(!f) return ""; const cls=f==="Pix"?"pix":f==="Dinheiro"?"dinheiro":f==="Cartão"?"cartao":""; return `<span class="forma ${cls}">${esc(f)}</span>`; }
@@ -610,7 +663,7 @@ function anexo(url){ return url?`<a class="anexo" href="${url}" target="_blank" 
 function renderFin(){
   const recM=fin.filter(d=>d.tipo==="receita").reduce((s,d)=>s+Number(d.valor),0);
   const desp=fin.filter(d=>d.tipo==="despesa").reduce((s,d)=>s+Number(d.valor),0);
-  const rec=recM+receitaCamisas();
+  const rec=recM+receitaCamisas()+receitaTriduo();
   $("#totRec").textContent=brl(rec); $("#totDesp").textContent=brl(desp); $("#totSaldo").textContent=brl(rec-desp);
   $("#cardSaldo").classList.toggle("neg",(rec-desp)<0);
   const caixa=saldoCaixaDinheiro(), conta=(rec-desp)-caixa;
@@ -783,14 +836,64 @@ async function salvarEntrega(id,entregue,obs){
   fecharModal(); await carregarTudo();
 }
 
+/* ---------- TRÍDUO (noites x grupos) ---------- */
+function receitaTriduo(){ return triduo.reduce((s,t)=>s+Number(t.valor||0),0); }
+function fillTriSelects(){
+  const on='<option value="">— selecione —</option>'+NOITES.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  const og='<option value="">— selecione —</option>'+GRUPOS_TRIDUO.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("");
+  const set=(sel,html,lista)=>{ const el=$(sel); if(el){ const a=el.value; el.innerHTML=html; if(lista.includes(a)) el.value=a; } };
+  set("#triNoite",on,NOITES); set("#triGrupo",og,GRUPOS_TRIDUO);
+  set("#triFiltroNoite",'<option value="">Noite: todas</option>'+NOITES.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join(""),NOITES);
+  set("#triFiltroGrupo",'<option value="">Grupo: todos</option>'+GRUPOS_TRIDUO.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join(""),GRUPOS_TRIDUO);
+}
+function renderTriduo(){
+  if(!$("#triTotal")) return;
+  fillTriSelects();
+  const total=receitaTriduo();
+  const somaNG=(n,g)=>triduo.filter(t=>t.noite===n&&t.grupo===g).reduce((s,t)=>s+Number(t.valor||0),0);
+  const totNoite=n=>triduo.filter(t=>t.noite===n).reduce((s,t)=>s+Number(t.valor||0),0);
+  const totGrupo=g=>triduo.filter(t=>t.grupo===g).reduce((s,t)=>s+Number(t.valor||0),0);
+  $("#triTotal").textContent=brl(total); $("#triQtd").textContent=triduo.length;
+  let top="—",topV=-1; NOITES.forEach(n=>{ const v=totNoite(n); if(v>topV){topV=v;top=n;} });
+  $("#triTop").textContent = total>0 ? `${top} · ${brl(topV)}` : "—";
+  const head='<tr><th>Grupo</th>'+NOITES.map(n=>`<th class="num">${esc(n)}</th>`).join("")+'<th class="num">Total</th></tr>';
+  const body=GRUPOS_TRIDUO.map(g=>`<tr><td><b>${esc(g)}</b></td>`+NOITES.map(n=>{const v=somaNG(n,g);return `<td class="num">${v?brl(v):"—"}</td>`;}).join("")+`<td class="num" style="font-weight:700">${brl(totGrupo(g))}</td></tr>`).join("");
+  const foot='<tr style="font-weight:700;background:#f7f9fb"><td>Total</td>'+NOITES.map(n=>`<td class="num">${brl(totNoite(n))}</td>`).join("")+`<td class="num">${brl(total)}</td></tr>`;
+  $("#triMatrizWrap").innerHTML=`<table><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table>`;
+  const q=$("#triBusca").value.toLowerCase(), fn=$("#triFiltroNoite").value, fg=$("#triFiltroGrupo").value;
+  const lista=triduo.filter(t=>{ if(fn&&t.noite!==fn)return false; if(fg&&t.grupo!==fg)return false; if(q&&!((t.descricao||"")+" "+(t.responsavel||"")+" "+(t.grupo||"")+" "+(t.noite||"")).toLowerCase().includes(q))return false; return true; });
+  $("#triCorpo").innerHTML=lista.map(t=>`<tr><td>${fmtData(t.data)}</td><td>${esc(t.noite)}</td><td>${esc(t.grupo)}</td><td>${esc(t.descricao)||"—"}</td><td>${formaTag(t.forma)||"—"}</td><td>${esc(t.responsavel)||"—"}</td><td class="valor rec">${brl(t.valor)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${t.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${t.id}" title="Excluir">🗑</button></td></tr>`).join("");
+  $("#triVazio").style.display=lista.length?"none":"block";
+  $("#triFoot").textContent=brl(lista.reduce((s,t)=>s+Number(t.valor||0),0));
+}
+async function addTri(e){
+  e.preventDefault();
+  const v=parseFloat($("#triValor").value);
+  if(!$("#triNoite").value||!$("#triGrupo").value){ alert("Escolha a noite e o grupo."); return; }
+  if(isNaN(v)||v<=0){ alert("Informe um valor válido."); return; }
+  const reg={noite:$("#triNoite").value,grupo:$("#triGrupo").value,descricao:$("#triDesc").value.trim(),valor:v,forma:$("#triForma").value,responsavel:$("#triResp").value.trim(),data:$("#triData").value};
+  $("#btnAddTri").disabled=true;
+  let error;
+  if(editTriId){ ({error}=await sb.from("triduo_lancamentos").update(reg).eq("id",editTriId)); }
+  else { ({error}=await sb.from("triduo_lancamentos").insert(reg)); }
+  $("#btnAddTri").disabled=false;
+  if(error){ alert("Erro ao salvar: "+error.message); return; }
+  cancelarEdicaoTri(); carregarTudo();
+}
+function cancelarEdicaoTri(){ editTriId=null; $("#btnCancelTri").classList.add("hide"); $("#formTri").reset(); $("#triData").value=hoje(); $("#btnAddTri").textContent="+ Adicionar lançamento"; fillTriSelects(); }
+function editarTri(id){ const t=triduo.find(x=>x.id===id); if(!t)return; editTriId=id; fillTriSelects();
+  $("#triNoite").value=t.noite; $("#triGrupo").value=t.grupo; $("#triDesc").value=t.descricao||""; $("#triValor").value=t.valor; $("#triForma").value=t.forma||""; $("#triResp").value=t.responsavel||""; $("#triData").value=t.data||hoje();
+  $("#painelTri").classList.remove("hide"); $("#btnAddTri").textContent="Salvar alterações"; $("#btnCancelTri").classList.remove("hide"); $("#painelTri").scrollIntoView({behavior:"smooth",block:"center"}); }
+
 /* ---------- RELATÓRIO ---------- */
 function renderRelatorio(){
   if(!$("#relData")) return;
   $("#relData").textContent="Gerado em "+new Date().toLocaleString("pt-BR");
   const recCamisas=receitaCamisas();
+  const recTri=receitaTriduo();
   const recM=fin.filter(d=>d.tipo==="receita").reduce((s,d)=>s+Number(d.valor),0);
   const desp=fin.filter(d=>d.tipo==="despesa").reduce((s,d)=>s+Number(d.valor),0);
-  const rec=recM+recCamisas;
+  const rec=recM+recCamisas+recTri;
   $("#relRec").textContent=brl(rec); $("#relDesp").textContent=brl(desp);
   $("#relSaldo").textContent=brl(rec-desp); $("#relSaldo").style.color=(rec-desp)<0?"var(--vermelho)":"var(--azul)";
   const relCx=saldoCaixaDinheiro(); $("#relCaixa").textContent=brl(relCx); $("#relConta").textContent=brl((rec-desp)-relCx);
@@ -798,6 +901,7 @@ function renderRelatorio(){
   // por categoria
   const porCat=tp=>{ const m={}; fin.filter(d=>d.tipo===tp).forEach(d=>{ const k=d.categoria||"(sem categoria)"; m[k]=(m[k]||0)+Number(d.valor); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
   const recCats=porCat("receita"); if(recCamisas>0) recCats.push(["👕 Camisas (vendas pagas)",recCamisas]);
+  GRUPOS_TRIDUO.forEach(g=>{ const v=triduo.filter(t=>t.grupo===g).reduce((s,t)=>s+Number(t.valor||0),0); if(v>0) recCats.push(["⛪ "+g,v]); });
   recCats.sort((a,b)=>b[1]-a[1]);
   const linhaCat=(arr,tot)=> (arr.length?arr.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${brl(v)}</td></tr>`).join(""):`<tr><td colspan="2" style="color:#9aa7b2">Nada lançado.</td></tr>`)
     +`<tr><td style="font-weight:700">Total</td><td class="n" style="font-weight:700">${brl(tot)}</td></tr>`;
@@ -810,6 +914,7 @@ function renderRelatorio(){
   const ent={}, sai={};
   fin.forEach(d=>{ const t=d.tipo==="receita"?ent:sai; const k=key(d.forma); t[k]=(t[k]||0)+Number(d.valor); });
   vendas.forEach(v=>{ if(Number(v.valor_pago)>0){ const k=key(v.forma); ent[k]=(ent[k]||0)+Number(v.valor_pago); } });
+  triduo.forEach(t=>{ if(Number(t.valor)>0){ const k=key(t.forma); ent[k]=(ent[k]||0)+Number(t.valor); } });
   const usadas=formas.filter(f=>ent[f]||sai[f]);
   $("#relForma").innerHTML=(usadas.length?usadas.map(f=>`<tr><td>${f}</td><td class="n">${brl(ent[f]||0)}</td><td class="n">${brl(sai[f]||0)}</td></tr>`).join(""):`<tr><td colspan="3" style="color:#9aa7b2">Sem lançamentos.</td></tr>`)
     +`<tr><td style="font-weight:700">Total</td><td class="n" style="font-weight:700">${brl(Object.values(ent).reduce((s,x)=>s+x,0))}</td><td class="n" style="font-weight:700">${brl(Object.values(sai).reduce((s,x)=>s+x,0))}</td></tr>`;
