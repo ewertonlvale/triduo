@@ -18,5 +18,11 @@ window.TRIDUO_CONFIG = {
     "PP Baby Look", "P Baby Look", "M Baby Look", "G Baby Look", "GG Baby Look",
     "PP Normal", "P Normal", "M Normal", "G Normal", "GG Normal",
     "Infantil 6 anos", "Infantil 8 anos", "Infantil 12 anos"
-  ]
+  ],
+
+  // Noites do tríduo (a ordem aqui é a ordem das colunas). Renomeie à vontade.
+  NOITES: [ "Missa de Rua", "1ª Noite", "2ª Noite", "3ª Noite", "4ª Noite"],
+
+  // Grupos de receita do tríduo.
+  GRUPOS_TRIDUO: ["Comidas e Bebidas", "Bazar", "Leilão", "Filipetas", "Oferta"]
 };
