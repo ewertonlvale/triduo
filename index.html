@@ -269,6 +269,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
     <div class="barra">
       <input type="text" id="busca" placeholder="🔍 Buscar...">
       <select id="filtroTipo"><option value="">Todos os tipos</option><option value="receita">Só receitas</option><option value="despesa">Só despesas</option></select>
+      <select id="filtroFormaFin"><option value="">Forma: todas</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select>
       <button class="btn-sec" id="btnCat">🏷️ Categorias</button>
       <button class="btn-sec" id="btnExportFin">⬇ CSV</button>
       <button class="btn-sec" id="btnReload">↻ Atualizar</button>
@@ -314,6 +315,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <input type="text" id="triBusca" placeholder="🔍 Buscar...">
       <select id="triFiltroNoite"><option value="">Noite: todas</option></select>
       <select id="triFiltroGrupo"><option value="">Grupo: todos</option></select>
+      <select id="triFiltroForma"><option value="">Forma: todas</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select>
     </div>
     <div class="lista">
       <table>
@@ -519,7 +521,7 @@ function ligarEventos(){
   $("#formLogin").onsubmit=entrar;
   $("#btnSair").onclick=async()=>{ try{ await sb.auth.signOut(); }catch(e){} location.reload(); };
   $("#btnRec").onclick=()=>setTipo("receita"); $("#btnDesp").onclick=()=>setTipo("despesa");
-  $("#busca").oninput=renderFin; $("#filtroTipo").onchange=renderFin;
+  $("#busca").oninput=renderFin; $("#filtroTipo").onchange=renderFin; $("#filtroFormaFin").onchange=renderFin;
   $("#btnReload").onclick=carregarTudo; $("#btnExportFin").onclick=exportarFin; $("#formFin").onsubmit=addFin;
   $("#btnCat").onclick=()=>{ const p=$("#catPainel"); p.style.display=p.style.display==="none"?"block":"none"; };
   $("#btnNovoFin").onclick=()=>$("#painelFin").classList.toggle("hide");
@@ -540,7 +542,7 @@ function ligarEventos(){
   $("#formTri").onsubmit=addTri;
   $("#btnNovoTri").onclick=()=>$("#painelTri").classList.toggle("hide");
   $("#btnCancelTri").onclick=cancelarEdicaoTri;
-  $("#triBusca").oninput=renderTriduo; $("#triFiltroNoite").onchange=renderTriduo; $("#triFiltroGrupo").onchange=renderTriduo;
+  $("#triBusca").oninput=renderTriduo; $("#triFiltroNoite").onchange=renderTriduo; $("#triFiltroGrupo").onchange=renderTriduo; $("#triFiltroForma").onchange=renderTriduo;
   $("#triCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir este lançamento?")) delFrom("triduo_lancamentos",t.dataset.id); } else if(t.dataset.edit){ editarTri(t.dataset.edit); } };
   fillTriSelects();
 }
@@ -669,8 +671,8 @@ function renderFin(){
   const caixa=saldoCaixaDinheiro(), conta=(rec-desp)-caixa;
   if($("#saldoCaixa")) $("#saldoCaixa").textContent=brl(caixa);
   if($("#saldoConta")) $("#saldoConta").textContent=brl(conta);
-  const q=$("#busca").value.toLowerCase(), ft=$("#filtroTipo").value;
-  const lista=fin.filter(d=>{ if(ft&&d.tipo!==ft) return false; if(q&&!((d.descricao||"")+" "+(d.categoria||"")+" "+(d.responsavel||"")).toLowerCase().includes(q)) return false; return true; });
+  const q=$("#busca").value.toLowerCase(), ft=$("#filtroTipo").value, ff=$("#filtroFormaFin")?$("#filtroFormaFin").value:"";
+  const lista=fin.filter(d=>{ if(ft&&d.tipo!==ft) return false; if(ff&&(d.forma||"")!==ff) return false; if(q&&!((d.descricao||"")+" "+(d.categoria||"")+" "+(d.responsavel||"")+" "+(d.detalhamento||"")).toLowerCase().includes(q)) return false; return true; });
   $("#corpoFin").innerHTML=lista.map(d=>{ const s=d.tipo==="receita"?"+":"−", c=d.tipo==="receita"?"rec":"desp";
     return `<tr><td>${fmtData(d.data)}</td><td><b>${esc(d.descricao)||"—"}</b> <span class="tag ${c}">${d.tipo==="receita"?"Rec.":"Desp."}</span>${d.detalhamento?`<div style="font-size:.8rem;color:#7a8896;white-space:normal;max-width:320px">${esc(d.detalhamento)}</div>`:""}</td><td>${esc(d.categoria)||"—"}</td><td>${formaTag(d.forma)||"—"}</td><td>${esc(d.responsavel)||"—"}</td><td class="valor ${c}">${s} ${brl(d.valor)}</td><td>${anexo(d.comprovante_url)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${d.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${d.id}" title="Excluir">🗑</button></td></tr>`; }).join("");
   $("#vazioFin").style.display=lista.length?"none":"block"; $("#vazioFin").textContent="Nenhum lançamento ainda.";
@@ -860,8 +862,8 @@ function renderTriduo(){
   const body=GRUPOS_TRIDUO.map(g=>`<tr><td><b>${esc(g)}</b></td>`+NOITES.map(n=>{const v=somaNG(n,g);return `<td class="num">${v?brl(v):"—"}</td>`;}).join("")+`<td class="num" style="font-weight:700">${brl(totGrupo(g))}</td></tr>`).join("");
   const foot='<tr style="font-weight:700;background:#f7f9fb"><td>Total</td>'+NOITES.map(n=>`<td class="num">${brl(totNoite(n))}</td>`).join("")+`<td class="num">${brl(total)}</td></tr>`;
   $("#triMatrizWrap").innerHTML=`<table><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table>`;
-  const q=$("#triBusca").value.toLowerCase(), fn=$("#triFiltroNoite").value, fg=$("#triFiltroGrupo").value;
-  const lista=triduo.filter(t=>{ if(fn&&t.noite!==fn)return false; if(fg&&t.grupo!==fg)return false; if(q&&!((t.descricao||"")+" "+(t.responsavel||"")+" "+(t.grupo||"")+" "+(t.noite||"")).toLowerCase().includes(q))return false; return true; });
+  const q=$("#triBusca").value.toLowerCase(), fn=$("#triFiltroNoite").value, fg=$("#triFiltroGrupo").value, ff=$("#triFiltroForma")?$("#triFiltroForma").value:"";
+  const lista=triduo.filter(t=>{ if(fn&&t.noite!==fn)return false; if(fg&&t.grupo!==fg)return false; if(ff&&(t.forma||"")!==ff)return false; if(q&&!((t.descricao||"")+" "+(t.responsavel||"")+" "+(t.grupo||"")+" "+(t.noite||"")).toLowerCase().includes(q))return false; return true; });
   $("#triCorpo").innerHTML=lista.map(t=>`<tr><td>${fmtData(t.data)}</td><td>${esc(t.noite)}</td><td>${esc(t.grupo)}</td><td>${esc(t.descricao)||"—"}</td><td>${formaTag(t.forma)||"—"}</td><td>${esc(t.responsavel)||"—"}</td><td class="valor rec">${brl(t.valor)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${t.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${t.id}" title="Excluir">🗑</button></td></tr>`).join("");
   $("#triVazio").style.display=lista.length?"none":"block";
   $("#triFoot").textContent=brl(lista.reduce((s,t)=>s+Number(t.valor||0),0));
