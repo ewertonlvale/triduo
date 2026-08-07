@@ -384,7 +384,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
     </div>
     <div class="lista">
       <table>
-        <thead><tr><th>Data</th><th>Comprador</th><th>Tam.</th><th class="num">Qtd</th><th class="num">Total</th><th>Forma</th><th>Pgto</th><th>Entrega</th><th></th><th></th><th></th></tr></thead>
+        <thead><tr><th>Venda</th><th>Comprador</th><th>Tam.</th><th class="num">Qtd</th><th class="num">Total</th><th>Forma</th><th>Pgto</th><th>Pago em</th><th>Entrega</th><th>Entregue em</th><th></th><th></th><th></th></tr></thead>
         <tbody id="corpoVenda"></tbody>
       </table>
       <div class="vazio" id="vazioVenda">Nenhuma venda registrada ainda.</div>
@@ -661,6 +661,7 @@ function saldoCaixaDinheiro(){
   return Math.round(caixa*100)/100;
 }
 function formaTag(f){ if(!f) return ""; const cls=f==="Pix"?"pix":f==="Dinheiro"?"dinheiro":f==="Cartão"?"cartao":""; return `<span class="forma ${cls}">${esc(f)}</span>`; }
+function formaCelula(v){ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; const fs=[...new Set(pg.map(p=>p.forma).filter(Boolean))]; if(fs.length>1) return `<span class="forma" title="${fs.join(', ')}">Vários</span>`; return formaTag(fs[0]||v.forma)||"—"; }
 function anexo(url){ return url?`<a class="anexo" href="${url}" target="_blank" title="Ver comprovante">📎</a>`:""; }
 function renderFin(){
   const recM=fin.filter(d=>d.tipo==="receita").reduce((s,d)=>s+Number(d.valor),0);
@@ -731,12 +732,14 @@ function renderVendas(){
     if(fTam&&(v.tamanho||"")!==fTam) return false;
     if(fEnt==="sim"&&!v.entregue) return false; if(fEnt==="nao"&&v.entregue) return false;
     if(fForma&&(v.forma||"")!==fForma) return false;
-    if(q&&!((v.comprador||"")+" "+(v.tamanho||"")+" "+(v.responsavel||"")).toLowerCase().includes(q)) return false; return true; });
+    if(q){ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; const hay=((v.comprador||"")+" "+(v.tamanho||"")+" "+(v.responsavel||"")+" "+(v.forma||"")+" "+fmtData(v.data)+" "+fmtData(v.entregue_em)+" "+pg.map(p=>fmtData(p.data)+" "+(p.forma||"")).join(" ")).toLowerCase(); if(!hay.includes(q)) return false; }
+    return true; });
   $("#corpoVenda").innerHTML=lista.map(v=>{ const st=situacao(v);
     const pagoTag=st==="pago"?`<span class="tag pago" data-act="ger" data-id="${v.id}">Pago</span>`:st==="parc"?`<span class="tag parc" data-act="ger" data-id="${v.id}">Falta ${brl(v.valor_total-v.valor_pago)}</span>`:`<span class="tag pend" data-act="ger" data-id="${v.id}">Pendente</span>`;
     const nota=v.entrega_obs?` <span title="${esc(v.entrega_obs)}">📝</span>`:"";
     const entTag=v.entregue?`<span class="tag entr" data-act="ger" data-id="${v.id}">Entregue</span>${nota}`:`<span class="tag nentr" data-act="ger" data-id="${v.id}">Não</span>`;
-    return `<tr><td>${fmtData(v.data)}</td><td><b>${esc(v.comprador)||"—"}</b></td><td>${esc(v.tamanho)}</td><td class="num">${v.quantidade}</td><td class="num">${brl(v.valor_total)}</td><td>${formaTag(v.forma)||"—"}</td><td>${pagoTag}</td><td>${entTag}</td><td><button class="btn-sec" style="padding:5px 9px" data-act="ger" data-id="${v.id}">⚙ Gerenciar</button></td><td>${anexo(v.comprovante_url)}</td><td><button class="del" data-id="${v.id}">🗑</button></td></tr>`; }).join("");
+    const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; const datas=pg.map(p=>p.data).filter(Boolean).sort(); const pagoEm=datas.length?datas[datas.length-1]:null;
+    return `<tr><td>${fmtData(v.data)}</td><td><b>${esc(v.comprador)||"—"}</b></td><td>${esc(v.tamanho)}</td><td class="num">${v.quantidade}</td><td class="num">${brl(v.valor_total)}</td><td>${formaCelula(v)}</td><td>${pagoTag}</td><td>${fmtData(pagoEm)}</td><td>${entTag}</td><td>${fmtData(v.entregue_em)}</td><td><button class="btn-sec" style="padding:5px 9px" data-act="ger" data-id="${v.id}">⚙ Gerenciar</button></td><td>${anexo(v.comprovante_url)}</td><td><button class="del" data-id="${v.id}">🗑</button></td></tr>`; }).join("");
   $("#vazioVenda").style.display=lista.length?"none":"block";
 }
 function onVendaClick(e){
@@ -752,7 +755,7 @@ function abrirGerenciar(id){
   const v=vendas.find(x=>x.id===id); if(!v) return;
   const total=Number(v.valor_total), pago=Number(v.valor_pago), falta=Math.max(0,total-pago);
   const pagtos=Array.isArray(v.pagamentos)?v.pagamentos:[];
-  const histHtml=pagtos.length?pagtos.map(p=>`<div class="pgto-lin"><span>${fmtData(p.data)} ${p.forma?"· "+esc(p.forma):""}</span><span style="font-weight:600;color:var(--verde)">${brl(p.valor)}</span></div>`).join(""):`<div style="color:#9aa7b2;font-size:.82rem">Nenhum pagamento registrado.</div>`;
+  const histHtml=pagtos.length?pagtos.map((p,i)=>`<div class="pgto-lin"><span>${i+1}) ${fmtData(p.data)} · ${p.forma?esc(p.forma):"sem forma"}</span><span style="display:flex;align-items:center;gap:10px"><b style="color:var(--verde)">${brl(p.valor)}</b><button class="del" data-rmpg="${i}" title="Remover este pagamento" style="font-size:1rem">×</button></span></div>`).join(""):`<div style="color:#9aa7b2;font-size:.85rem">Nenhum pagamento registrado ainda.</div>`;
   $("#modalBox").innerHTML=`
     <button class="btn-fechar" id="mFechar">×</button>
     <h3>${esc(v.comprador)||"Pedido"} · ${esc(v.tamanho)}</h3>
@@ -760,17 +763,25 @@ function abrirGerenciar(id){
 
     <div class="box">
       <h4>💳 Pagamento</h4>
-      <div style="display:flex;justify-content:space-between;font-size:.9rem;margin-bottom:8px">
-        <span>Pago: <b style="color:var(--verde)">${brl(pago)}</b></span>
-        <span>Falta: <b style="color:${falta>0?"var(--laranja)":"var(--verde)"}">${brl(falta)}</b></span>
+      <div style="display:flex;justify-content:space-between;font-size:.95rem;margin-bottom:12px">
+        <span>Pago <b style="color:var(--verde)">${brl(pago)}</b> de ${brl(total)}</span>
+        <span>Falta <b style="color:${falta>0?"var(--laranja)":"var(--verde)"}">${brl(falta)}</b></span>
       </div>
+      <div style="font-size:.72rem;color:#7a8896;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Pagamentos registrados</div>
       ${histHtml}
-      <div class="linha-inp" style="margin-top:10px">
-        <div class="campo"><label>Registrar pagamento (R$)</label><input type="number" id="mValor" step="0.01" min="0" placeholder="${falta>0?falta.toFixed(2):"0,00"}" inputmode="decimal"></div>
-        <div class="campo"><label>Forma</label><select id="mForma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
-        <button class="btn-sec" id="mAddPg" style="background:var(--verde);color:#fff;border:none;padding:10px 14px">Dar baixa</button>
+      <div style="border-top:1px solid var(--borda);margin-top:14px;padding-top:12px">
+        <div style="font-weight:600;font-size:.85rem;margin-bottom:8px">➕ Registrar novo pagamento</div>
+        <div class="linha-inp">
+          <div class="campo"><label>Valor (R$)</label><input type="number" id="mValor" step="0.01" min="0" placeholder="${falta>0?falta.toFixed(2):"0,00"}" inputmode="decimal"></div>
+          <div class="campo"><label>Forma</label><select id="mForma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
+          <div class="campo"><label>Data</label><input type="date" id="mData" value="${hoje()}"></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn-sec" id="mAddPg" style="flex:1;background:var(--verde);color:#fff;border:none;padding:11px">Registrar pagamento</button>
+          ${falta>0?`<button class="btn-sec" id="mQuitar" style="flex:1">Quitar tudo (${brl(falta)})</button>`:""}
+        </div>
+        ${falta<=0?`<div style="margin-top:8px;color:var(--verde);font-weight:600;font-size:.85rem">✓ Totalmente pago</div>`:""}
       </div>
-      ${falta>0?`<button class="btn-sec" id="mQuitar" style="margin-top:8px;width:100%">Quitar tudo (${brl(falta)})</button>`:`<div style="margin-top:8px;color:var(--verde);font-weight:600;font-size:.85rem">✓ Totalmente pago</div>`}
     </div>
 
     <div class="box">
@@ -785,26 +796,30 @@ function abrirGerenciar(id){
     </div>
 
     <div class="box">
-      <h4>✏️ Editar dados do pedido</h4>
-      <div class="campo" style="margin-bottom:8px"><label>Comprador</label><input type="text" id="eComprador" value="${esc(v.comprador)}"></div>
-      <div class="linha-inp">
-        <div class="campo"><label>Tamanho</label><select id="eTam">${optsTam(v.tamanho)}</select></div>
-        <div class="campo"><label>Qtd</label><input type="number" id="eQtd" min="1" step="1" value="${v.quantidade}"></div>
-        <div class="campo"><label>Valor unit.</label><input type="number" id="eUnit" step="0.01" min="0" value="${Number(v.valor_unit)}"></div>
-      </div>
-      <div class="linha-inp" style="margin-top:8px">
-        <div class="campo"><label>Forma</label><select id="eForma">${optsForma(v.forma)}</select></div>
-        <div class="campo"><label>Data</label><input type="date" id="eData" value="${v.data||hoje()}"></div>
-        <button class="btn-sec" id="eSalvar" style="background:var(--verde);color:#fff;border:none;padding:10px 14px">Salvar dados</button>
+      <button class="btn-sec" id="mToggleEdit" style="width:100%">✏️ Editar dados do pedido</button>
+      <div id="mEditFields" class="hide" style="margin-top:12px">
+        <div class="campo" style="margin-bottom:8px"><label>Comprador</label><input type="text" id="eComprador" value="${esc(v.comprador)}"></div>
+        <div class="linha-inp">
+          <div class="campo"><label>Tamanho</label><select id="eTam">${optsTam(v.tamanho)}</select></div>
+          <div class="campo"><label>Qtd</label><input type="number" id="eQtd" min="1" step="1" value="${v.quantidade}"></div>
+          <div class="campo"><label>Valor unit.</label><input type="number" id="eUnit" step="0.01" min="0" value="${Number(v.valor_unit)}"></div>
+        </div>
+        <div class="linha-inp" style="margin-top:8px">
+          <div class="campo"><label>Data da venda</label><input type="date" id="eData" value="${v.data||hoje()}"></div>
+          <button class="btn-sec" id="eSalvar" style="background:var(--verde);color:#fff;border:none;padding:10px 14px">Salvar dados</button>
+        </div>
+        <input type="hidden" id="eForma" value="${esc(v.forma||'')}">
       </div>
     </div>`;
   $("#modalBg").classList.remove("hide");
   $("#mFechar").onclick=fecharModal;
-  $("#mAddPg").onclick=async()=>{ const val=parseFloat($("#mValor").value); if(isNaN(val)||val<=0){ alert("Informe um valor."); return; } await registrarPagamento(v,val,$("#mForma").value); };
-  const q=$("#mQuitar"); if(q) q.onclick=async()=>{ await registrarPagamento(v,falta,$("#mForma").value); };
+  $("#mAddPg").onclick=async()=>{ const val=parseFloat($("#mValor").value); if(isNaN(val)||val<=0){ alert("Informe um valor."); return; } await registrarPagamento(v,val,$("#mForma").value,$("#mData").value); };
+  const mq=$("#mQuitar"); if(mq) mq.onclick=async()=>{ await registrarPagamento(v,falta,$("#mForma").value,$("#mData").value); };
+  $("#modalBox").querySelectorAll("[data-rmpg]").forEach(b=>b.onclick=()=>removerPagamento(v,parseInt(b.dataset.rmpg)));
   const be=$("#mEntregar"); if(be) be.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim()); };
   const bo=$("#mSalvarObs"); if(bo) bo.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim()); };
   const bd=$("#mDesent"); if(bd) bd.onclick=async()=>{ await salvarEntrega(id,false,$("#mObs").value.trim()); };
+  $("#mToggleEdit").onclick=()=>$("#mEditFields").classList.toggle("hide");
   $("#eSalvar").onclick=()=>editarVenda(id);
 }
 function optsTam(sel){ const lista=TAMANHOS.includes(sel)||!sel?TAMANHOS:[sel,...TAMANHOS]; return lista.map(t=>`<option${t===sel?" selected":""}>${esc(t)}</option>`).join(""); }
@@ -820,14 +835,22 @@ async function editarVenda(id){
   if(error){ alert("Erro: "+error.message); return; }
   fecharModal(); await carregarTudo();
 }
-async function registrarPagamento(v,valor,forma){
+async function registrarPagamento(v,valor,forma,data){
   const total=Number(v.valor_total);
   const novoPago=Math.min(total,Number(v.valor_pago)+valor);
   const reg=Math.round((novoPago-Number(v.valor_pago))*100)/100;
-  const pagtos=(Array.isArray(v.pagamentos)?v.pagamentos:[]).concat([{data:hoje(),valor:reg,forma:forma||null}]);
+  const pagtos=(Array.isArray(v.pagamentos)?v.pagamentos:[]).concat([{data:data||hoje(),valor:reg,forma:forma||null}]);
   const upd={valor_pago:novoPago,pagamentos:pagtos};
   if(forma&&!v.forma) upd.forma=forma;
   const {error}=await sb.from("camisas_vendas").update(upd).eq("id",v.id);
+  if(error){ alert("Erro: "+error.message); return; }
+  fecharModal(); await carregarTudo();
+}
+async function removerPagamento(v,idx){
+  if(!confirm("Remover este pagamento?")) return;
+  const pagtos=(Array.isArray(v.pagamentos)?v.pagamentos:[]).slice(); pagtos.splice(idx,1);
+  const novoPago=Math.round(pagtos.reduce((s,p)=>s+Number(p.valor||0),0)*100)/100;
+  const {error}=await sb.from("camisas_vendas").update({valor_pago:novoPago,pagamentos:pagtos}).eq("id",v.id);
   if(error){ alert("Erro: "+error.message); return; }
   fecharModal(); await carregarTudo();
 }
