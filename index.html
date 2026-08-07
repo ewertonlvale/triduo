@@ -381,6 +381,9 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <select id="filtroPag"><option value="">Status: todos</option><option value="pago">Pago</option><option value="parc">Parcial</option><option value="pend">Pendente</option></select>
       <select id="filtroEnt"><option value="">Entrega: todas</option><option value="sim">Entregue</option><option value="nao">Não entregue</option></select>
       <select id="filtroForma"><option value="">Forma: todas</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select>
+      <div style="display:flex;flex-direction:column;gap:2px;font-size:.68rem;color:#7a8896"><span>Pago em</span><input type="date" id="filtroPagoEm" style="min-width:135px"></div>
+      <div style="display:flex;flex-direction:column;gap:2px;font-size:.68rem;color:#7a8896"><span>Entregue em</span><input type="date" id="filtroEntregueEm" style="min-width:135px"></div>
+      <button class="btn-sec" id="btnLimparV" title="Limpar filtros">✕ Limpar</button>
     </div>
     <div class="lista">
       <table>
@@ -534,6 +537,8 @@ function ligarEventos(){
   $("#formEst").onsubmit=addEstoque; $("#formVenda").onsubmit=addVenda;
   $("#buscaV").oninput=renderVendas; $("#filtroPag").onchange=renderVendas;
   $("#filtroTam").onchange=renderVendas; $("#filtroEnt").onchange=renderVendas; $("#filtroForma").onchange=renderVendas;
+  $("#filtroPagoEm").onchange=renderVendas; $("#filtroEntregueEm").onchange=renderVendas;
+  $("#btnLimparV").onclick=()=>{ ["#buscaV","#filtroTam","#filtroPag","#filtroEnt","#filtroForma","#filtroPagoEm","#filtroEntregueEm"].forEach(s=>{ if($(s))$(s).value=""; }); renderVendas(); };
   fillTamSelects();
   $("#corpoEst").onclick=e=>{ if(e.target.classList.contains("del")&&confirm("Remover esta entrada de estoque?")) delFrom("camisas_estoque",e.target.dataset.id); };
   $("#corpoVenda").onclick=onVendaClick;
@@ -727,11 +732,14 @@ function situacao(v){ const t=Number(v.valor_total),p=Number(v.valor_pago); if(p
 function renderVendas(){
   const q=$("#buscaV").value.toLowerCase(), f=$("#filtroPag").value;
   const fTam=$("#filtroTam")?$("#filtroTam").value:"", fEnt=$("#filtroEnt")?$("#filtroEnt").value:"", fForma=$("#filtroForma")?$("#filtroForma").value:"";
+  const fPago=$("#filtroPagoEm")?$("#filtroPagoEm").value:"", fEntreg=$("#filtroEntregueEm")?$("#filtroEntregueEm").value:"";
   const lista=vendas.filter(v=>{ const st=situacao(v);
     if(f&&st!==f) return false;
     if(fTam&&(v.tamanho||"")!==fTam) return false;
     if(fEnt==="sim"&&!v.entregue) return false; if(fEnt==="nao"&&v.entregue) return false;
     if(fForma&&(v.forma||"")!==fForma) return false;
+    if(fPago){ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; if(!pg.some(p=>p.data===fPago)) return false; }
+    if(fEntreg&&(v.entregue_em||"")!==fEntreg) return false;
     if(q){ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; const hay=((v.comprador||"")+" "+(v.tamanho||"")+" "+(v.responsavel||"")+" "+(v.forma||"")+" "+fmtData(v.data)+" "+fmtData(v.entregue_em)+" "+pg.map(p=>fmtData(p.data)+" "+(p.forma||"")).join(" ")).toLowerCase(); if(!hay.includes(q)) return false; }
     return true; });
   $("#corpoVenda").innerHTML=lista.map(v=>{ const st=situacao(v);
@@ -769,19 +777,19 @@ function abrirGerenciar(id){
       </div>
       <div style="font-size:.72rem;color:#7a8896;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Pagamentos registrados</div>
       ${histHtml}
+      ${falta>0?`
       <div style="border-top:1px solid var(--borda);margin-top:14px;padding-top:12px">
         <div style="font-weight:600;font-size:.85rem;margin-bottom:8px">➕ Registrar novo pagamento</div>
         <div class="linha-inp">
-          <div class="campo"><label>Valor (R$)</label><input type="number" id="mValor" step="0.01" min="0" placeholder="${falta>0?falta.toFixed(2):"0,00"}" inputmode="decimal"></div>
+          <div class="campo"><label>Valor (R$)</label><input type="number" id="mValor" step="0.01" min="0" placeholder="${falta.toFixed(2)}" inputmode="decimal"></div>
           <div class="campo"><label>Forma</label><select id="mForma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
           <div class="campo"><label>Data</label><input type="date" id="mData" value="${hoje()}"></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px">
           <button class="btn-sec" id="mAddPg" style="flex:1;background:var(--verde);color:#fff;border:none;padding:11px">Registrar pagamento</button>
-          ${falta>0?`<button class="btn-sec" id="mQuitar" style="flex:1">Quitar tudo (${brl(falta)})</button>`:""}
+          <button class="btn-sec" id="mQuitar" style="flex:1">Quitar tudo (${brl(falta)})</button>
         </div>
-        ${falta<=0?`<div style="margin-top:8px;color:var(--verde);font-weight:600;font-size:.85rem">✓ Totalmente pago</div>`:""}
-      </div>
+      </div>`:`<div style="border-top:1px solid var(--borda);margin-top:14px;padding-top:12px;color:var(--verde);font-weight:600;font-size:.9rem">✓ Totalmente pago</div>`}
     </div>
 
     <div class="box">
@@ -813,7 +821,7 @@ function abrirGerenciar(id){
     </div>`;
   $("#modalBg").classList.remove("hide");
   $("#mFechar").onclick=fecharModal;
-  $("#mAddPg").onclick=async()=>{ const val=parseFloat($("#mValor").value); if(isNaN(val)||val<=0){ alert("Informe um valor."); return; } await registrarPagamento(v,val,$("#mForma").value,$("#mData").value); };
+  const bAdd=$("#mAddPg"); if(bAdd) bAdd.onclick=async()=>{ const val=parseFloat($("#mValor").value); if(isNaN(val)||val<=0){ alert("Informe um valor."); return; } await registrarPagamento(v,val,$("#mForma").value,$("#mData").value); };
   const mq=$("#mQuitar"); if(mq) mq.onclick=async()=>{ await registrarPagamento(v,falta,$("#mForma").value,$("#mData").value); };
   $("#modalBox").querySelectorAll("[data-rmpg]").forEach(b=>b.onclick=()=>removerPagamento(v,parseInt(b.dataset.rmpg)));
   const be=$("#mEntregar"); if(be) be.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim()); };
