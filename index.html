@@ -801,11 +801,13 @@ function abrirGerenciar(id){
 
     <div class="box">
       <h4>📦 Entrega</h4>
-      <div class="campo" style="margin-bottom:8px"><label>Observação da entrega</label><input type="text" id="mObs" value="${esc(v.entrega_obs)}" placeholder="Ex.: entregue à Maria no domingo"></div>
-      ${v.entregue?`<div style="font-size:.82rem;color:#1a56db;margin-bottom:8px">✓ Entregue${v.entregue_em?" em "+fmtData(v.entregue_em):""}</div>`:""}
-      <div style="display:flex;gap:8px">
+      <div class="linha-inp">
+        <div class="campo" style="flex:2"><label>Observação da entrega</label><input type="text" id="mObs" value="${esc(v.entrega_obs)}" placeholder="Ex.: entregue à Maria no domingo"></div>
+        <div class="campo"><label>Data da entrega</label><input type="date" id="mEntData" value="${v.entregue_em||hoje()}"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px">
         ${v.entregue
-          ?`<button class="btn-sec" id="mSalvarObs" style="flex:1">Salvar observação</button><button class="btn-sec" id="mDesent" style="flex:1">Desmarcar entrega</button>`
+          ?`<button class="btn-sec" id="mSalvarObs" style="flex:1">Salvar entrega</button><button class="btn-sec" id="mDesent" style="flex:1">Desmarcar entrega</button>`
           :`<button class="btn-sec" id="mEntregar" style="flex:1;background:#1a56db;color:#fff;border:none">Confirmar entrega</button>`}
       </div>
     </div>
@@ -832,9 +834,9 @@ function abrirGerenciar(id){
   const mq=$("#mQuitar"); if(mq) mq.onclick=async()=>{ await registrarPagamento(v,falta,$("#mForma").value,$("#mData").value); };
   $("#modalBox").querySelectorAll("[data-rmrow]").forEach(b=>b.onclick=()=>b.closest(".pgto-lin").remove());
   const bsp=$("#mSalvarPg"); if(bsp) bsp.onclick=()=>salvarPagamentos(v);
-  const be=$("#mEntregar"); if(be) be.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim()); };
-  const bo=$("#mSalvarObs"); if(bo) bo.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim()); };
-  const bd=$("#mDesent"); if(bd) bd.onclick=async()=>{ await salvarEntrega(id,false,$("#mObs").value.trim()); };
+  const be=$("#mEntregar"); if(be) be.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim(),$("#mEntData").value); };
+  const bo=$("#mSalvarObs"); if(bo) bo.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim(),$("#mEntData").value); };
+  const bd=$("#mDesent"); if(bd) bd.onclick=async()=>{ await salvarEntrega(id,false,$("#mObs").value.trim(),null); };
   $("#mToggleEdit").onclick=()=>$("#mEditFields").classList.toggle("hide");
   $("#eSalvar").onclick=()=>editarVenda(id);
 }
@@ -873,8 +875,8 @@ async function salvarPagamentos(v){
   if(error){ alert("Erro: "+error.message); return; }
   fecharModal(); await carregarTudo();
 }
-async function salvarEntrega(id,entregue,obs){
-  const upd={entregue,entrega_obs:obs||null,entregue_em:entregue?hoje():null};
+async function salvarEntrega(id,entregue,obs,dataEntrega){
+  const upd={entregue,entrega_obs:obs||null,entregue_em:entregue?(dataEntrega||hoje()):null};
   const {error}=await sb.from("camisas_vendas").update(upd).eq("id",id);
   if(error){ alert("Erro: "+error.message); return; }
   fecharModal(); await carregarTudo();
