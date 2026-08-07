@@ -701,7 +701,8 @@ async function addVenda(e){
   let pago=$("#vPagoInt").checked?total:(parseFloat($("#vPago").value)||0); if(pago>total) pago=total;
   $("#btnAddVenda").disabled=true; $("#btnAddVenda").textContent="Salvando…";
   let url=null; try{ url=await subirComprovante($("#vFile"),"camisas"); }catch(err){ $("#btnAddVenda").disabled=false; $("#btnAddVenda").textContent="+ Registrar venda"; return; }
-  const {error}=await sb.from("camisas_vendas").insert({comprador:$("#vComprador").value.trim(),tamanho:$("#vTam").value.trim(),quantidade:qtd,valor_unit:unit,valor_total:total,valor_pago:pago,forma:$("#vForma").value,entregue:$("#vEntregue").checked,comprovante_url:url,responsavel:$("#vResp").value.trim(),data:$("#vData").value});
+  const pagamentos = pago>0 ? [{data:$("#vData").value||hoje(), valor:pago, forma:$("#vForma").value||null}] : [];
+  const {error}=await sb.from("camisas_vendas").insert({comprador:$("#vComprador").value.trim(),tamanho:$("#vTam").value.trim(),quantidade:qtd,valor_unit:unit,valor_total:total,valor_pago:pago,pagamentos,forma:$("#vForma").value,entregue:$("#vEntregue").checked,comprovante_url:url,responsavel:$("#vResp").value.trim(),data:$("#vData").value});
   $("#btnAddVenda").disabled=false; $("#btnAddVenda").textContent="+ Registrar venda";
   if(error){ alert("Erro ao salvar: "+error.message); return; }
   e.target.reset(); $("#vQtd").value=1; $("#vData").value=hoje(); carregarTudo();
@@ -762,8 +763,14 @@ $("#modalBg")&&($("#modalBg").onclick=e=>{ if(e.target.id==="modalBg") fecharMod
 function abrirGerenciar(id){
   const v=vendas.find(x=>x.id===id); if(!v) return;
   const total=Number(v.valor_total), pago=Number(v.valor_pago), falta=Math.max(0,total-pago);
-  const pagtos=Array.isArray(v.pagamentos)?v.pagamentos:[];
-  const histHtml=pagtos.length?pagtos.map((p,i)=>`<div class="pgto-lin"><span>${i+1}) ${fmtData(p.data)} · ${p.forma?esc(p.forma):"sem forma"}</span><span style="display:flex;align-items:center;gap:10px"><b style="color:var(--verde)">${brl(p.valor)}</b><button class="del" data-rmpg="${i}" title="Remover este pagamento" style="font-size:1rem">×</button></span></div>`).join(""):`<div style="color:#9aa7b2;font-size:.85rem">Nenhum pagamento registrado ainda.</div>`;
+  let pagtos=Array.isArray(v.pagamentos)?v.pagamentos.slice():[];
+  if(!pagtos.length && Number(v.valor_pago)>0){ pagtos=[{data:null,valor:Number(v.valor_pago),forma:v.forma||null}]; }
+  const histHtml=pagtos.length?(pagtos.map(p=>`<div class="pgto-lin" style="flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-start">
+        <input type="date" class="pg-data" value="${p.data||""}" style="min-width:120px;flex:0 0 auto">
+        <select class="pg-forma" style="min-width:88px;flex:0 0 auto">${optsForma(p.forma)}</select>
+        <input type="number" step="0.01" min="0" class="pg-valor" value="${Number(p.valor)}" style="width:82px;flex:0 0 auto">
+        <button class="del" data-rmrow="1" title="Remover" style="font-size:1rem">×</button>
+      </div>`).join("")+`<button class="btn-sec" id="mSalvarPg" style="margin-top:10px;width:100%">💾 Salvar pagamentos</button>`):`<div style="color:#9aa7b2;font-size:.85rem">Nenhum pagamento registrado ainda.</div>`;
   $("#modalBox").innerHTML=`
     <button class="btn-fechar" id="mFechar">×</button>
     <h3>${esc(v.comprador)||"Pedido"} · ${esc(v.tamanho)}</h3>
@@ -823,7 +830,8 @@ function abrirGerenciar(id){
   $("#mFechar").onclick=fecharModal;
   const bAdd=$("#mAddPg"); if(bAdd) bAdd.onclick=async()=>{ const val=parseFloat($("#mValor").value); if(isNaN(val)||val<=0){ alert("Informe um valor."); return; } await registrarPagamento(v,val,$("#mForma").value,$("#mData").value); };
   const mq=$("#mQuitar"); if(mq) mq.onclick=async()=>{ await registrarPagamento(v,falta,$("#mForma").value,$("#mData").value); };
-  $("#modalBox").querySelectorAll("[data-rmpg]").forEach(b=>b.onclick=()=>removerPagamento(v,parseInt(b.dataset.rmpg)));
+  $("#modalBox").querySelectorAll("[data-rmrow]").forEach(b=>b.onclick=()=>b.closest(".pgto-lin").remove());
+  const bsp=$("#mSalvarPg"); if(bsp) bsp.onclick=()=>salvarPagamentos(v);
   const be=$("#mEntregar"); if(be) be.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim()); };
   const bo=$("#mSalvarObs"); if(bo) bo.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim()); };
   const bd=$("#mDesent"); if(bd) bd.onclick=async()=>{ await salvarEntrega(id,false,$("#mObs").value.trim()); };
@@ -854,10 +862,13 @@ async function registrarPagamento(v,valor,forma,data){
   if(error){ alert("Erro: "+error.message); return; }
   fecharModal(); await carregarTudo();
 }
-async function removerPagamento(v,idx){
-  if(!confirm("Remover este pagamento?")) return;
-  const pagtos=(Array.isArray(v.pagamentos)?v.pagamentos:[]).slice(); pagtos.splice(idx,1);
-  const novoPago=Math.round(pagtos.reduce((s,p)=>s+Number(p.valor||0),0)*100)/100;
+async function salvarPagamentos(v){
+  const datas=[...$("#modalBox").querySelectorAll(".pg-data")];
+  const formas=[...$("#modalBox").querySelectorAll(".pg-forma")];
+  const valores=[...$("#modalBox").querySelectorAll(".pg-valor")];
+  const pagtos=datas.map((d,i)=>({ data:d.value||null, forma:(formas[i]&&formas[i].value)||null, valor:Math.round((parseFloat(valores[i].value)||0)*100)/100 })).filter(p=>p.valor>0);
+  const total=Number(v.valor_total);
+  let novoPago=Math.round(pagtos.reduce((s,p)=>s+p.valor,0)*100)/100; if(novoPago>total) novoPago=total;
   const {error}=await sb.from("camisas_vendas").update({valor_pago:novoPago,pagamentos:pagtos}).eq("id",v.id);
   if(error){ alert("Erro: "+error.message); return; }
   fecharModal(); await carregarTudo();
