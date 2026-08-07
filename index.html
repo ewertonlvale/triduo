@@ -145,6 +145,7 @@
     <button data-tab="tri">⛪ Tríduo</button>
     <button data-tab="cam">👕 Camisas</button>
     <button data-tab="rel">📊 Relatório</button>
+    <button data-tab="cfg">⚙️ Config</button>
   </div>
 </header>
 
@@ -257,57 +258,6 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       </form>
     </div>
 
-    <div class="painel" id="catPainel" style="display:none">
-      <h2>🏷️ Categorias</h2>
-      <form id="formCat" style="grid-template-columns:2fr 1fr auto">
-        <div class="campo"><label for="catNome">Nova categoria</label><input type="text" id="catNome" placeholder="Ex.: Cozinha, Bar, Doação" required></div>
-        <div class="campo"><label for="catTipo">Aplica a</label><select id="catTipo"><option value="ambos">Ambos</option><option value="receita">Receita</option><option value="despesa">Despesa</option></select></div>
-        <div class="campo" style="just-content:flex-end"><label>&nbsp;</label><button type="submit" class="btn-sec" style="background:var(--roxo);color:#fff;border:none;padding:11px 16px">Adicionar</button></div>
-      </form>
-      <div id="catChips" style="margin-top:12px"></div>
-    </div>
-
-    <div class="painel" id="transfPainel" style="display:none">
-      <h2>🔄 Transferência caixa ↔ conta</h2>
-      <p style="font-size:.82rem;color:#7a8896;margin:0 0 12px">Move dinheiro entre o caixa e a conta. <b>Não</b> conta como receita nem despesa — o saldo total continua igual, só muda a divisão.</p>
-      <form id="formTransf">
-        <div class="campo"><label for="tSentido">Movimento</label><select id="tSentido"><option value="caixa_conta">💵 Caixa → 💳 Conta</option><option value="conta_caixa">💳 Conta → 💵 Caixa</option></select></div>
-        <div class="campo"><label for="tValor">Valor (R$)</label><input type="number" id="tValor" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
-        <div class="campo"><label for="tData">Data</label><input type="date" id="tData" required></div>
-        <div class="campo"><label for="tObs">Observação (opcional)</label><input type="text" id="tObs" placeholder="Ex.: depósito no banco"></div>
-        <button type="submit" class="btn-add" id="btnAddTransf">+ Registrar transferência</button>
-      </form>
-      <div class="lista" style="margin-top:12px;margin-bottom:0">
-        <table>
-          <thead><tr><th>Data</th><th>Movimento</th><th class="num">Valor</th><th></th></tr></thead>
-          <tbody id="transfCorpo"></tbody>
-        </table>
-        <div class="vazio" id="transfVazio">Nenhuma transferência registrada.</div>
-      </div>
-    </div>
-
-    <div class="painel" id="reembPainel" style="display:none">
-      <h2>💸 Reembolsos a ressarcir</h2>
-      <p style="font-size:.82rem;color:#7a8896;margin:0 0 10px">Gastos que alguém pagou com dinheiro próprio e ainda não foram devolvidos. <b>Pendente não afeta o saldo</b> (o dinheiro é da pessoa). Ao marcar <b>ressarcido</b>, vira despesa (o evento devolveu o valor).</p>
-      <div style="font-weight:600;margin-bottom:12px">Total a ressarcir: <span id="reembTotal" style="color:var(--laranja)">R$ 0,00</span></div>
-      <form id="formReemb">
-        <div class="campo full"><label for="rDesc">Descrição do gasto</label><input type="text" id="rDesc" placeholder="Ex.: Compra de gás" required></div>
-        <div class="campo"><label for="rPessoa">Quem pagou</label><input type="text" id="rPessoa" placeholder="Nome de quem adiantou"></div>
-        <div class="campo"><label for="rValor">Valor (R$)</label><input type="number" id="rValor" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
-        <div class="campo"><label for="rCat">Categoria</label><input type="text" id="rCat" list="cats" placeholder="Ex.: Cozinha"></div>
-        <div class="campo"><label for="rData">Data do gasto</label><input type="date" id="rData" required></div>
-        <div class="campo full"><label for="rFile">Comprovante (opcional)</label><input type="file" id="rFile" accept="image/*,.pdf"></div>
-        <button type="submit" class="btn-add" id="btnAddReemb" style="background:var(--laranja)">+ Registrar reembolso pendente</button>
-      </form>
-      <div class="lista" style="margin-top:12px;margin-bottom:0">
-        <table>
-          <thead><tr><th>Data</th><th>Quem pagou</th><th>Descrição</th><th class="num">Valor</th><th>Status</th><th></th><th></th></tr></thead>
-          <tbody id="reembCorpo"></tbody>
-        </table>
-        <div class="vazio" id="reembVazio">Nenhum reembolso registrado.</div>
-      </div>
-    </div>
-
     <div class="barra">
       <input type="text" id="busca" placeholder="🔍 Buscar...">
       <select id="filtroTipo"><option value="">Todos os tipos</option><option value="receita">Só receitas</option><option value="despesa">Só despesas</option></select>
@@ -316,10 +266,6 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <div style="display:flex;flex-direction:column;gap:2px;font-size:.68rem;color:#7a8896"><span>De</span><input type="date" id="filtroDataDe" style="min-width:130px"></div>
       <div style="display:flex;flex-direction:column;gap:2px;font-size:.68rem;color:#7a8896"><span>Até</span><input type="date" id="filtroDataAte" style="min-width:130px"></div>
       <button class="btn-sec" id="btnLimparFin">✕ Limpar</button>
-      <button class="btn-sec" id="btnCat">🏷️ Categorias</button>
-      <button class="btn-sec" id="btnReemb">💸 Reembolsos</button>
-      <button class="btn-sec" id="btnTransf">🔄 Transferências</button>
-      <button class="btn-sec" id="btnExportFin">⬇ CSV</button>
       <button class="btn-sec" id="btnReload">↻ Atualizar</button>
     </div>
     <div class="aviso" style="background:#eaf6ef;border-color:#bfe3cd">💡 Camisas <b>pagas</b> já entram nas Receitas. Aqui lance doações, barracas e as <b>despesas</b> (inclusive a compra das camisas).</div>
@@ -509,6 +455,66 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
     </div>
   </div>
 
+  <!-- ===== ABA CONFIG ===== -->
+  <div id="app-cfg" class="hide">
+    <div class="painel">
+      <h2>📥 Exportar tudo (Excel)</h2>
+      <p style="font-size:.82rem;color:#7a8896;margin:0 0 12px">Baixa uma planilha Excel com todas as abas: Financeiro, Tríduo, Camisas, Estoque, Transferências e Reembolsos.</p>
+      <button class="btn-add" id="btnExportTudo" style="margin:0">⬇ Baixar planilha completa</button>
+    </div>
+
+    <div class="painel">
+      <h2>🏷️ Categorias</h2>
+      <form id="formCat" style="grid-template-columns:2fr 1fr auto">
+        <div class="campo"><label for="catNome">Nova categoria</label><input type="text" id="catNome" placeholder="Ex.: Cozinha, Bar, Doação" required></div>
+        <div class="campo"><label for="catTipo">Aplica a</label><select id="catTipo"><option value="ambos">Ambos</option><option value="receita">Receita</option><option value="despesa">Despesa</option></select></div>
+        <div class="campo"><label>&nbsp;</label><button type="submit" class="btn-sec" style="background:var(--roxo);color:#fff;border:none;padding:11px 16px">Adicionar</button></div>
+      </form>
+      <div id="catChips" style="margin-top:12px"></div>
+    </div>
+
+    <div class="painel">
+      <h2>💸 Reembolsos a ressarcir</h2>
+      <p style="font-size:.82rem;color:#7a8896;margin:0 0 10px">Gastos que alguém pagou com dinheiro próprio e ainda não foram devolvidos. <b>Pendente não afeta o saldo</b> (o dinheiro é da pessoa). Ao marcar <b>ressarcido</b>, vira despesa (o evento devolveu o valor).</p>
+      <div style="font-weight:600;margin-bottom:12px">Total a ressarcir: <span id="reembTotal" style="color:var(--laranja)">R$ 0,00</span></div>
+      <form id="formReemb">
+        <div class="campo full"><label for="rDesc">Descrição do gasto</label><input type="text" id="rDesc" placeholder="Ex.: Compra de gás" required></div>
+        <div class="campo"><label for="rPessoa">Quem pagou</label><input type="text" id="rPessoa" placeholder="Nome de quem adiantou"></div>
+        <div class="campo"><label for="rValor">Valor (R$)</label><input type="number" id="rValor" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
+        <div class="campo"><label for="rCat">Categoria</label><input type="text" id="rCat" list="cats" placeholder="Ex.: Cozinha"></div>
+        <div class="campo"><label for="rData">Data do gasto</label><input type="date" id="rData" required></div>
+        <div class="campo full"><label for="rFile">Comprovante (opcional)</label><input type="file" id="rFile" accept="image/*,.pdf"></div>
+        <button type="submit" class="btn-add" id="btnAddReemb" style="background:var(--laranja)">+ Registrar reembolso pendente</button>
+      </form>
+      <div class="lista" style="margin-top:12px;margin-bottom:0">
+        <table>
+          <thead><tr><th>Data</th><th>Quem pagou</th><th>Descrição</th><th class="num">Valor</th><th>Status</th><th></th><th></th></tr></thead>
+          <tbody id="reembCorpo"></tbody>
+        </table>
+        <div class="vazio" id="reembVazio">Nenhum reembolso registrado.</div>
+      </div>
+    </div>
+
+    <div class="painel">
+      <h2>🔄 Transferência caixa ↔ conta</h2>
+      <p style="font-size:.82rem;color:#7a8896;margin:0 0 12px">Move dinheiro entre o caixa e a conta. <b>Não</b> conta como receita nem despesa — o saldo total continua igual, só muda a divisão.</p>
+      <form id="formTransf">
+        <div class="campo"><label for="tSentido">Movimento</label><select id="tSentido"><option value="caixa_conta">💵 Caixa → 💳 Conta</option><option value="conta_caixa">💳 Conta → 💵 Caixa</option></select></div>
+        <div class="campo"><label for="tValor">Valor (R$)</label><input type="number" id="tValor" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
+        <div class="campo"><label for="tData">Data</label><input type="date" id="tData" required></div>
+        <div class="campo"><label for="tObs">Observação (opcional)</label><input type="text" id="tObs" placeholder="Ex.: depósito no banco"></div>
+        <button type="submit" class="btn-add" id="btnAddTransf">+ Registrar transferência</button>
+      </form>
+      <div class="lista" style="margin-top:12px;margin-bottom:0">
+        <table>
+          <thead><tr><th>Data</th><th>Movimento</th><th class="num">Valor</th><th></th></tr></thead>
+          <tbody id="transfCorpo"></tbody>
+        </table>
+        <div class="vazio" id="transfVazio">Nenhuma transferência registrada.</div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== MODAL GERENCIAR PEDIDO ===== -->
   <div class="modal-bg hide" id="modalBg"><div class="modal" id="modalBox"></div></div>
 
@@ -518,6 +524,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="config.js"></script>
 <script>
 /* ====== As chaves ficam no arquivo config.js (não precisa mexer aqui) ====== */
@@ -542,7 +549,7 @@ const hoje=()=>new Date().toISOString().slice(0,10);
 function getCfg(){ if(SUPABASE_URL&&SUPABASE_ANON_KEY) return {url:SUPABASE_URL,key:SUPABASE_ANON_KEY}; try{ return JSON.parse(localStorage.getItem(LS)) }catch(e){ return null } }
 function setStatus(e,t){ const d=$("#dot"); d.className="dot"+(e==="on"?" on":e==="off"?" off":""); $("#statusTxt").textContent=t; }
 
-$$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("ativa")); b.classList.add("ativa"); const t=b.dataset.tab; $("#app-fin").classList.toggle("hide",t!=="fin"); $("#app-tri").classList.toggle("hide",t!=="tri"); $("#app-cam").classList.toggle("hide",t!=="cam"); $("#app-rel").classList.toggle("hide",t!=="rel"); if(t==="rel") renderRelatorio(); if(t==="tri") renderTriduo(); });
+$$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("ativa")); b.classList.add("ativa"); const t=b.dataset.tab; $("#app-fin").classList.toggle("hide",t!=="fin"); $("#app-tri").classList.toggle("hide",t!=="tri"); $("#app-cam").classList.toggle("hide",t!=="cam"); $("#app-rel").classList.toggle("hide",t!=="rel"); $("#app-cfg").classList.toggle("hide",t!=="cfg"); if(t==="rel") renderRelatorio(); if(t==="tri") renderTriduo(); });
 
 async function iniciar(){
   const cfg=getCfg();
@@ -556,7 +563,7 @@ async function iniciar(){
   }catch(e){ mostrarLogin(); }
   try{ sb.auth.onAuthStateChange((_e,s)=>{ if(s) mostrarApp(); else mostrarLogin(); }); }catch(e){}
 }
-function mostrarLogin(){ setStatus("off","Faça login"); $("#login").classList.remove("hide"); $("#tabs").classList.add("hide"); $("#btnSair").classList.add("hide"); $("#app-fin").classList.add("hide"); $("#app-tri").classList.add("hide"); $("#app-cam").classList.add("hide"); $("#app-rel").classList.add("hide"); }
+function mostrarLogin(){ setStatus("off","Faça login"); $("#login").classList.remove("hide"); $("#tabs").classList.add("hide"); $("#btnSair").classList.add("hide"); $("#app-fin").classList.add("hide"); $("#app-tri").classList.add("hide"); $("#app-cam").classList.add("hide"); $("#app-rel").classList.add("hide"); $("#app-cfg").classList.add("hide"); }
 function mostrarApp(){
   $("#login").classList.add("hide"); $("#tabs").classList.remove("hide"); $("#btnSair").classList.remove("hide"); $("#app-fin").classList.remove("hide");
   if(_appIniciado) return;            // evita reinicializar a cada evento de login (não empilha assinaturas)
@@ -575,13 +582,11 @@ function ligarEventos(){
   $("#busca").oninput=renderFin; $("#filtroTipo").onchange=renderFin; $("#filtroFormaFin").onchange=renderFin;
   $("#filtroCatFin").onchange=renderFin; $("#filtroDataDe").onchange=renderFin; $("#filtroDataAte").onchange=renderFin;
   $("#btnLimparFin").onclick=()=>{ ["#busca","#filtroTipo","#filtroFormaFin","#filtroCatFin","#filtroDataDe","#filtroDataAte"].forEach(s=>{ if($(s))$(s).value=""; }); renderFin(); };
-  $("#btnReload").onclick=carregarTudo; $("#btnExportFin").onclick=exportarFin; $("#formFin").onsubmit=addFin;
-  $("#btnCat").onclick=()=>{ const p=$("#catPainel"); p.style.display=p.style.display==="none"?"block":"none"; };
-  $("#btnTransf").onclick=()=>{ const p=$("#transfPainel"); p.style.display=p.style.display==="none"?"block":"none"; };
+  $("#btnReload").onclick=carregarTudo; $("#formFin").onsubmit=addFin;
+  $("#btnExportTudo").onclick=exportarTudo;
   $("#formTransf").onsubmit=addTransf;
   $("#transfCorpo").onclick=e=>{ if(e.target.classList.contains("del")&&confirm("Excluir esta transferência?")) delFrom("transferencias",e.target.dataset.id); };
-  $("#btnReemb").onclick=()=>{ const p=$("#reembPainel"); p.style.display=p.style.display==="none"?"block":"none"; };
-  $("#reembLink").onclick=e=>{ e.preventDefault(); $("#reembPainel").style.display="block"; $("#reembPainel").scrollIntoView({behavior:"smooth",block:"center"}); };
+  $("#reembLink").onclick=e=>{ e.preventDefault(); document.querySelector('#tabs button[data-tab="cfg"]').click(); };
   $("#formReemb").onsubmit=addReemb;
   $("#reembCorpo").onclick=e=>{ const t=e.target;
     if(t.classList.contains("del")){ if(confirm("Excluir este reembolso?")) delFrom("reembolsos",t.dataset.id); return; }
@@ -1160,6 +1165,19 @@ function baixarCSV(nome,cab,linhas){ const csv="﻿"+cab.join(";")+"\n"+linhas.j
 function exportarFin(){ if(!fin.length){ alert("Nada para exportar."); return; } baixarCSV("triduo-financeiro-"+hoje()+".csv",["data","tipo","descricao","detalhamento","categoria","forma","responsavel","valor","comprovante"],fin.map(d=>[d.data,d.tipo,d.descricao,d.detalhamento,d.categoria,d.forma,d.responsavel,Number(d.valor).toFixed(2),d.comprovante_url].map(campoCSV).join(";"))); }
 function exportarCam(){ if(!vendas.length){ alert("Nada para exportar."); return; } baixarCSV("triduo-camisas-"+hoje()+".csv",["data","comprador","tamanho","quantidade","valor_unit","valor_total","valor_pago","falta","forma","situacao","entregue","entregue_em","entrega_obs","responsavel","comprovante"],vendas.map(v=>[v.data,v.comprador,v.tamanho,v.quantidade,Number(v.valor_unit).toFixed(2),Number(v.valor_total).toFixed(2),Number(v.valor_pago).toFixed(2),Math.max(0,Number(v.valor_total)-Number(v.valor_pago)).toFixed(2),v.forma,situacao(v),v.entregue?"sim":"não",v.entregue_em||"",v.entrega_obs||"",v.responsavel,v.comprovante_url].map(campoCSV).join(";"))); }
 function campoCSV(v){ v=String(v??""); return /[";\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+function exportarTudo(){
+  if(typeof XLSX==="undefined"){ alert("Biblioteca de Excel não carregou. Verifique a internet e recarregue."); return; }
+  const wb=XLSX.utils.book_new();
+  const add=(nome,arr)=>{ const ws=XLSX.utils.json_to_sheet(arr.length?arr:[{}]); XLSX.utils.book_append_sheet(wb,ws,nome); };
+  add("Financeiro", fin.map(d=>({Data:d.data,Tipo:d.tipo,"Descrição":d.descricao,Detalhamento:d.detalhamento,Categoria:d.categoria,Forma:d.forma,"Responsável":d.responsavel,Valor:Number(d.valor),Comprovante:d.comprovante_url})));
+  add("Tríduo", triduo.map(t=>({Data:t.data,Noite:t.noite,Grupo:t.grupo,"Descrição":t.descricao,Forma:t.forma,"Responsável":t.responsavel,Valor:Number(t.valor)})));
+  add("Camisas", vendas.map(v=>({Data:v.data,Comprador:v.comprador,Tamanho:v.tamanho,Qtd:v.quantidade,"Valor unit.":Number(v.valor_unit),Total:Number(v.valor_total),Pago:Number(v.valor_pago),Falta:Math.max(0,Number(v.valor_total)-Number(v.valor_pago)),"Situação":situacao(v),Forma:v.forma,Entregue:v.entregue?"sim":"não","Entregue em":v.entregue_em,"Obs entrega":v.entrega_obs,"Responsável":v.responsavel,Pagamentos:(Array.isArray(v.pagamentos)?v.pagamentos:[]).map(p=>`${fmtData(p.data)} ${p.forma||""} R$${Number(p.valor).toFixed(2)}`).join(" | ")})));
+  const estMap={}; estoque.forEach(e=>{ const k=e.tamanho||"—"; estMap[k]=(estMap[k]||0)+Number(e.quantidade||0); });
+  add("Estoque", Object.entries(estMap).map(([t,q])=>({Tamanho:t,Produzida:q,Vendida:vendidasPorTam(t),Entregue:entreguesPorTam(t),Estoque:q-entreguesPorTam(t),"Disponível":q-vendidasPorTam(t)})));
+  add("Transferências", transferencias.map(t=>({Data:t.data,Movimento:t.sentido==="caixa_conta"?"Caixa→Conta":"Conta→Caixa",Valor:Number(t.valor),"Observação":t.obs})));
+  add("Reembolsos", reembolsos.map(r=>({Data:r.data,"Quem pagou":r.pessoa,"Descrição":r.descricao,Categoria:r.categoria,Valor:Number(r.valor),Status:r.ressarcido?"Ressarcido":"Pendente",Forma:r.forma,"Ressarcido em":r.data_ressarcimento,Comprovante:r.comprovante_url})));
+  XLSX.writeFile(wb, "triduo-completo-"+hoje()+".xlsx");
+}
 function fmtData(iso){ if(!iso) return "—"; const [a,m,d]=iso.split("-"); return `${d}/${m}/${a.slice(2)}`; }
 function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])) }
 
