@@ -66,6 +66,13 @@ create table if not exists transferencias (
   data date not null default current_date, obs text,
   created_at timestamptz default now());
 
+create table if not exists reembolsos (
+  id uuid primary key default gen_random_uuid(),
+  descricao text, pessoa text, valor numeric not null, categoria text,
+  data date not null default current_date, comprovante_url text, obs text,
+  ressarcido boolean not null default false, forma text, data_ressarcimento date,
+  created_at timestamptz default now());
+
 -- Segurança: só usuários logados acessam
 alter table categorias enable row level security;
 alter table lancamentos enable row level security;
@@ -73,12 +80,14 @@ alter table camisas_estoque enable row level security;
 alter table camisas_vendas enable row level security;
 alter table triduo_lancamentos enable row level security;
 alter table transferencias enable row level security;
+alter table reembolsos enable row level security;
 create policy "logados" on categorias for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
 create policy "logados" on lancamentos for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
 create policy "logados" on camisas_estoque for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
 create policy "logados" on camisas_vendas for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
 create policy "logados" on triduo_lancamentos for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
 create policy "logados" on transferencias for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
+create policy "logados" on reembolsos for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
 
 -- Armazenamento dos comprovantes
 insert into storage.buckets (id,name,public) values ('comprovantes','comprovantes',true) on conflict (id) do nothing;
