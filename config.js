@@ -24,5 +24,5 @@ window.TRIDUO_CONFIG = {
   NOITES: [ "Missa de Rua", "1ª Noite", "2ª Noite", "3ª Noite", "4ª Noite"],
 
   // Grupos de receita do tríduo.
-  GRUPOS_TRIDUO: ["Comidas e Bebidas", "Bazar", "Leilão", "Filipetas", "Oferta"]
+  GRUPOS_TRIDUO: ["Barraca", "Bazar", "Leilão", "Oferta"]
 };
