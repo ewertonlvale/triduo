@@ -1220,7 +1220,7 @@ function relatorioFilipetasPDF(){
   const lista=[...filipetas].sort((a,b)=>(a.nome||"").localeCompare(b.nome||""));
   const status=f=>f.pago?(f.confirmado?"Confirmado":"Pago"):"Pendente";
   const rows=lista.map((f,i)=>`<tr><td>${i+1}</td><td>${esc(f.nome)||"—"}</td><td>${esc(f.noite)||"—"}</td><td style="text-align:center">${f.quantidade||1}</td><td style="text-align:right">${brl(f.valor)}</td><td>${esc(f.forma)||"—"}</td><td>${status(f)}</td></tr>`).join("");
-  let blank=""; for(let i=0;i<22;i++){ blank+=`<tr><td style="height:28px"></td><td></td><td></td><td></td><td></td><td></td></tr>`; }
+  let blank=""; for(let i=0;i<22;i++){ blank+=`<tr><td style="height:28px"></td><td></td><td></td><td></td><td></td></tr>`; }
   $("#filPrint").innerHTML=`
     <h1>🎟️ Filipetas — Controle do Tríduo</h1>
     <div class="meta">Gerado em ${dataStr} · ${filipetas.length} registro(s) · ${qtdTot} filipeta(s) · Arrecadado (pago): ${brl(total)}</div>
@@ -1228,9 +1228,8 @@ function relatorioFilipetasPDF(){
     <table><thead><tr><th style="width:28px">#</th><th>Nome</th><th>Noite</th><th style="width:44px">Qtd</th><th style="width:90px">Valor</th><th style="width:80px">Forma</th><th style="width:90px">Status</th></tr></thead>
       <tbody>${rows||'<tr><td colspan="7" style="text-align:center;color:#777">Nenhuma filipeta cadastrada.</td></tr>'}</tbody></table>
     <div class="pb"></div>
-    <h1>🎟️ Filipetas — Folha para preencher à mão</h1>
-    <div class="meta">Anote aqui durante o evento e depois lance no app.</div>
-    <table><thead><tr><th>Nome</th><th style="width:110px">Noite</th><th style="width:44px">Qtd</th><th style="width:90px">Valor</th><th style="width:90px">Forma</th><th style="width:70px">Pago?</th></tr></thead>
+    <h1>🎟️ Filipetas — Comunidade Nossa Senhora do Desterro</h1>
+    <table><thead><tr><th>Nome</th><th style="width:75px;text-align:center">Qtd</th><th style="width:120px;text-align:center">Valor</th><th style="width:120px;text-align:center">Forma</th><th style="width:100px;text-align:center">Pago?</th></tr></thead>
       <tbody>${blank}</tbody></table>`;
   document.body.classList.add("print-fil");
   window.print();
