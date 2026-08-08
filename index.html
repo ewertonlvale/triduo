@@ -93,6 +93,15 @@
   .aviso{background:#fff8e1; border:1px solid #ffe08a; border-radius:8px; padding:10px 12px; font-size:.82rem; margin:12px 0}
   .erro{color:var(--vermelho); font-size:.85rem; margin-top:8px; min-height:18px}
   .hide{display:none !important}
+  /* Visibilidade das abas controlada por CSS (à prova de falha do JS):
+     por padrão todas escondidas; só a aba ativa (body[data-view]) aparece. */
+  #app-fin,#app-tri,#app-fil,#app-cam,#app-rel,#app-cfg{display:none}
+  body[data-view="fin"] #app-fin,
+  body[data-view="tri"] #app-tri,
+  body[data-view="fil"] #app-fil,
+  body[data-view="cam"] #app-cam,
+  body[data-view="rel"] #app-rel,
+  body[data-view="cfg"] #app-cfg{display:block}
   /* Modal gerenciar */
   .modal-bg{position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:flex-start; justify-content:center; padding:24px 12px; z-index:50; overflow:auto}
   .modal{background:#fff; border-radius:14px; max-width:460px; width:100%; padding:18px; box-shadow:0 10px 40px rgba(0,0,0,.2)}
@@ -226,7 +235,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
   </div>
 
   <!-- ===== ABA FINANCEIRO ===== -->
-  <div id="app-fin" class="hide">
+  <div id="app-fin">
     <div class="cards c3">
       <div class="card rec"><div class="rot">Receitas (tudo)</div><div class="val" id="totRec">R$ 0,00</div></div>
       <div class="card desp"><div class="rot">Despesas</div><div class="val" id="totDesp">R$ 0,00</div></div>
@@ -281,7 +290,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
   </div>
 
   <!-- ===== ABA TRÍDUO ===== -->
-  <div id="app-tri" class="hide">
+  <div id="app-tri">
     <div class="cards c3">
       <div class="card rec"><div class="rot">Arrecadado no tríduo</div><div class="val" id="triTotal">R$ 0,00</div></div>
       <div class="card info"><div class="rot">Lançamentos</div><div class="val" id="triQtd">0</div></div>
@@ -323,7 +332,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
   </div>
 
   <!-- ===== ABA FILIPETAS ===== -->
-  <div id="app-fil" class="hide">
+  <div id="app-fil">
     <div class="cards c4">
       <div class="card rec"><div class="rot">Arrecadado (pago)</div><div class="val" id="filArrec">R$ 0,00</div></div>
       <div class="card alerta"><div class="rot">A receber</div><div class="val" id="filFalta">R$ 0,00</div></div>
@@ -365,7 +374,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
   </div>
 
   <!-- ===== ABA CAMISAS ===== -->
-  <div id="app-cam" class="hide">
+  <div id="app-cam">
     <div class="cards c5">
       <div class="card rec"><div class="rot">Arrecadado</div><div class="val" id="camArrec">R$ 0,00</div></div>
       <div class="card alerta"><div class="rot">Falta receber</div><div class="val" id="camFalta">R$ 0,00</div></div>
@@ -432,7 +441,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
   </div>
 
   <!-- ===== ABA RELATÓRIO ===== -->
-  <div id="app-rel" class="hide">
+  <div id="app-rel">
     <div class="painel">
       <div class="rel-head">
         <div><h2>📊 Relatório do Tríduo</h2><div style="font-size:.82rem;color:#7a8896" id="relData"></div></div>
@@ -499,7 +508,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
   </div>
 
   <!-- ===== ABA CONFIG ===== -->
-  <div id="app-cfg" class="hide">
+  <div id="app-cfg">
     <div class="painel">
       <h2>📥 Exportar tudo (Excel)</h2>
       <p style="font-size:.82rem;color:#7a8896;margin:0 0 12px">Baixa uma planilha Excel com todas as abas: Financeiro, Tríduo, Camisas, Estoque, Transferências e Reembolsos.</p>
@@ -592,7 +601,7 @@ const hoje=()=>new Date().toISOString().slice(0,10);
 function getCfg(){ if(SUPABASE_URL&&SUPABASE_ANON_KEY) return {url:SUPABASE_URL,key:SUPABASE_ANON_KEY}; try{ return JSON.parse(localStorage.getItem(LS)) }catch(e){ return null } }
 function setStatus(e,t){ const d=$("#dot"); d.className="dot"+(e==="on"?" on":e==="off"?" off":""); $("#statusTxt").textContent=t; }
 
-$$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("ativa")); b.classList.add("ativa"); const t=b.dataset.tab; $("#app-fin").classList.toggle("hide",t!=="fin"); $("#app-tri").classList.toggle("hide",t!=="tri"); $("#app-fil").classList.toggle("hide",t!=="fil"); $("#app-cam").classList.toggle("hide",t!=="cam"); $("#app-rel").classList.toggle("hide",t!=="rel"); $("#app-cfg").classList.toggle("hide",t!=="cfg"); if(t==="rel") renderRelatorio(); if(t==="tri") renderTriduo(); if(t==="fil") renderFilipetas(); });
+$$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("ativa")); b.classList.add("ativa"); const t=b.dataset.tab; document.body.dataset.view=t; if(t==="rel") renderRelatorio(); if(t==="tri") renderTriduo(); if(t==="fil") renderFilipetas(); });
 
 async function iniciar(){
   const cfg=getCfg();
@@ -606,9 +615,10 @@ async function iniciar(){
   }catch(e){ mostrarLogin(); }
   try{ sb.auth.onAuthStateChange((_e,s)=>{ if(s) mostrarApp(); else mostrarLogin(); }); }catch(e){}
 }
-function mostrarLogin(){ setStatus("off","Faça login"); $("#login").classList.remove("hide"); $("#tabs").classList.add("hide"); $("#btnSair").classList.add("hide"); $("#app-fin").classList.add("hide"); $("#app-tri").classList.add("hide"); $("#app-fil").classList.add("hide"); $("#app-cam").classList.add("hide"); $("#app-rel").classList.add("hide"); $("#app-cfg").classList.add("hide"); }
+function mostrarLogin(){ setStatus("off","Faça login"); $("#login").classList.remove("hide"); $("#tabs").classList.add("hide"); $("#btnSair").classList.add("hide"); document.body.removeAttribute("data-view"); }
 function mostrarApp(){
-  $("#login").classList.add("hide"); $("#tabs").classList.remove("hide"); $("#btnSair").classList.remove("hide"); $("#app-fin").classList.remove("hide");
+  $("#login").classList.add("hide"); $("#tabs").classList.remove("hide"); $("#btnSair").classList.remove("hide");
+  if(!document.body.dataset.view){ document.body.dataset.view="fin"; $$("#tabs button").forEach(x=>x.classList.toggle("ativa",x.dataset.tab==="fin")); }
   if(_appIniciado) return;            // evita reinicializar a cada evento de login (não empilha assinaturas)
   _appIniciado=true;
   $("#data").value=hoje(); $("#vData").value=hoje(); $("#triData").value=hoje(); if($("#tData"))$("#tData").value=hoje(); if($("#rData"))$("#rData").value=hoje(); if($("#filData"))$("#filData").value=hoje(); carregarTudo(); assinar();
