@@ -1,4 +1,4 @@
-const CACHE = "triduo-v26";
+const CACHE = "triduo-v27";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", e => {

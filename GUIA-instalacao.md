@@ -76,7 +76,8 @@ create table if not exists reembolsos (
 create table if not exists filipetas (
   id uuid primary key default gen_random_uuid(),
   nome text, noite text, quantidade int not null default 1, valor numeric not null, forma text,
-  pago boolean not null default false, data date not null default current_date,
+  pago boolean not null default false, confirmado boolean not null default false,
+  data date not null default current_date,
   data_pagamento date, obs text, responsavel text,
   created_at timestamptz default now());
 

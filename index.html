@@ -324,10 +324,11 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
 
   <!-- ===== ABA FILIPETAS ===== -->
   <div id="app-fil" class="hide">
-    <div class="cards c3">
-      <div class="card rec"><div class="rot">Arrecadado</div><div class="val" id="filArrec">R$ 0,00</div></div>
+    <div class="cards c4">
+      <div class="card rec"><div class="rot">Arrecadado (pago)</div><div class="val" id="filArrec">R$ 0,00</div></div>
       <div class="card alerta"><div class="rot">A receber</div><div class="val" id="filFalta">R$ 0,00</div></div>
-      <div class="card info"><div class="rot">Filipetas</div><div class="val" id="filQtd">0</div></div>
+      <div class="card saldo"><div class="rot">✓ Confirmado</div><div class="val" id="filConf" style="color:var(--verde)">R$ 0,00</div></div>
+      <div class="card info"><div class="rot">Qtd filipetas</div><div class="val" id="filQtd">0</div></div>
     </div>
     <button class="btn-add" id="btnNovoFil" style="margin:0 0 14px">➕ Nova filipeta</button>
     <div class="painel hide" id="painelFil">
@@ -349,7 +350,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
     <div class="barra">
       <input type="text" id="filBusca" placeholder="🔍 Nome...">
       <select id="filFiltroNoite"><option value="">Noite: todas</option></select>
-      <select id="filFiltroStatus"><option value="">Status: todos</option><option value="pago">Pago</option><option value="pend">Pendente</option></select>
+      <select id="filFiltroStatus"><option value="">Status: todos</option><option value="pend">Pendente</option><option value="aconfirmar">Pago (a confirmar)</option><option value="confirmado">Confirmado</option><option value="pago">Todos pagos</option></select>
       <select id="filFiltroForma"><option value="">Forma: todas</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select>
       <button class="btn-sec" id="btnLimparFil">✕ Limpar</button>
     </div>
@@ -635,7 +636,7 @@ function ligarEventos(){
   $("#btnCancelFil").onclick=cancelarEdicaoFil;
   $("#filBusca").oninput=renderFilipetas; $("#filFiltroNoite").onchange=renderFilipetas; $("#filFiltroStatus").onchange=renderFilipetas; $("#filFiltroForma").onchange=renderFilipetas;
   $("#btnLimparFil").onclick=()=>{ ["#filBusca","#filFiltroNoite","#filFiltroStatus","#filFiltroForma"].forEach(s=>{ if($(s))$(s).value=""; }); renderFilipetas(); };
-  $("#filCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],[data-baixa],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir esta filipeta?")) delFrom("filipetas",t.dataset.id); } else if(t.dataset.baixa){ baixaFil(t.dataset.baixa); } else if(t.dataset.edit){ editarFil(t.dataset.edit); } };
+  $("#filCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],[data-baixa],[data-confirmar],[data-desconfirmar],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir esta filipeta?")) delFrom("filipetas",t.dataset.id); } else if(t.dataset.confirmar){ confirmarFil(t.dataset.confirmar,true); } else if(t.dataset.desconfirmar){ confirmarFil(t.dataset.desconfirmar,false); } else if(t.dataset.baixa){ baixaFil(t.dataset.baixa); } else if(t.dataset.edit){ editarFil(t.dataset.edit); } };
   $("#reembCorpo").onclick=e=>{ const t=e.target;
     if(t.classList.contains("del")){ if(confirm("Excluir este reembolso?")) delFrom("reembolsos",t.dataset.id); return; }
     if(t.dataset.rss){ const sel=$("#reembCorpo").querySelector('.rss-forma[data-id="'+t.dataset.rss+'"]'); ressarcir(t.dataset.rss, sel?sel.value:"Dinheiro"); return; }
@@ -1124,17 +1125,25 @@ function renderFilipetas(){
   fillFilSelects();
   const arrec=filipetas.filter(f=>f.pago).reduce((s,f)=>s+Number(f.valor||0),0);
   const falta=filipetas.filter(f=>!f.pago).reduce((s,f)=>s+Number(f.valor||0),0);
-  $("#filArrec").textContent=brl(arrec); $("#filFalta").textContent=brl(falta); $("#filQtd").textContent=filipetas.reduce((s,f)=>s+Number(f.quantidade||1),0);
+  const conf=filipetas.filter(f=>f.pago&&f.confirmado).reduce((s,f)=>s+Number(f.valor||0),0);
+  $("#filArrec").textContent=brl(arrec); $("#filFalta").textContent=brl(falta); if($("#filConf"))$("#filConf").textContent=brl(conf); $("#filQtd").textContent=filipetas.reduce((s,f)=>s+Number(f.quantidade||1),0);
   const q=$("#filBusca").value.toLowerCase(), fn=$("#filFiltroNoite").value, fst=$("#filFiltroStatus").value, ff=$("#filFiltroForma").value;
   const lista=filipetas.filter(f=>{
     if(fn&&(f.noite||"")!==fn) return false;
-    if(fst==="pago"&&!f.pago) return false; if(fst==="pend"&&f.pago) return false;
+    if(fst==="pago"&&!f.pago) return false;
+    if(fst==="pend"&&f.pago) return false;
+    if(fst==="aconfirmar"&&!(f.pago&&!f.confirmado)) return false;
+    if(fst==="confirmado"&&!f.confirmado) return false;
     if(ff&&(f.forma||"")!==ff) return false;
     if(q&&!((f.nome||"")+" "+(f.noite||"")+" "+(f.responsavel||"")+" "+(f.obs||"")).toLowerCase().includes(q)) return false;
     return true;
   });
   $("#filCorpo").innerHTML=lista.map(f=>{
-    const st=f.pago?`<span class="tag pago" data-baixa="${f.id}" title="Clique para desmarcar">Pago</span>`:`<span class="tag pend" data-baixa="${f.id}" title="Clique para dar baixa">Pendente</span>`;
+    const st=!f.pago
+      ? `<span class="tag pend" data-baixa="${f.id}" title="Marcar pago">Pendente</span>`
+      : (f.confirmado
+          ? `<span class="tag pago" data-desconfirmar="${f.id}" title="Desfazer confirmação">✓ Confirmado</span>`
+          : `<span class="tag parc" data-baixa="${f.id}" title="Desmarcar pago">Pago</span> <button class="btn-sec" style="padding:3px 8px;font-size:.72rem" data-confirmar="${f.id}">✓ Confirmar</button>`);
     return `<tr><td>${fmtData(f.data)}</td><td><b>${esc(f.nome)||"—"}</b>${f.obs?`<div style="font-size:.78rem;color:#7a8896">${esc(f.obs)}</div>`:""}</td><td>${esc(f.noite)||"—"}</td><td class="num">${f.quantidade||1}</td><td class="num">${brl(f.valor)}</td><td>${formaTag(f.forma)||"—"}</td><td>${st}</td><td>${fmtData(f.data_pagamento)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${f.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${f.id}" title="Excluir">🗑</button></td></tr>`;
   }).join("");
   $("#filVazio").style.display=lista.length?"none":"block";
@@ -1159,7 +1168,8 @@ function cancelarEdicaoFil(){ editFilId=null; $("#btnCancelFil").classList.add("
 function editarFil(id){ const f=filipetas.find(x=>x.id===id); if(!f)return; editFilId=id; fillFilSelects();
   $("#filNome").value=f.nome||""; $("#filNoite").value=f.noite||""; $("#filQtdInput").value=f.quantidade||1; $("#filValor").value=f.valor; $("#filForma").value=f.forma||""; $("#filData").value=f.data||hoje(); $("#filResp").value=f.responsavel||""; $("#filObs").value=f.obs||""; $("#filPago").checked=!!f.pago;
   $("#painelFil").classList.remove("hide"); $("#btnAddFil").textContent="Salvar alterações"; $("#btnCancelFil").classList.remove("hide"); $("#painelFil").scrollIntoView({behavior:"smooth",block:"center"}); }
-async function baixaFil(id){ const f=filipetas.find(x=>x.id===id); if(!f)return; const novo=!f.pago; const {error}=await sb.from("filipetas").update({pago:novo,data_pagamento:novo?hoje():null}).eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
+async function baixaFil(id){ const f=filipetas.find(x=>x.id===id); if(!f)return; const novo=!f.pago; const {error}=await sb.from("filipetas").update({pago:novo,data_pagamento:novo?hoje():null,confirmado:novo?!!f.confirmado:false}).eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
+async function confirmarFil(id,val){ const {error}=await sb.from("filipetas").update({confirmado:val}).eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
 
 /* ---------- RELATÓRIO ---------- */
 function renderRelatorio(){
@@ -1277,7 +1287,7 @@ function exportarTudo(){
   const add=(nome,arr)=>{ const ws=XLSX.utils.json_to_sheet(arr.length?arr:[{}]); XLSX.utils.book_append_sheet(wb,ws,nome); };
   add("Financeiro", fin.map(d=>({Data:d.data,Tipo:d.tipo,"Descrição":d.descricao,Detalhamento:d.detalhamento,Categoria:d.categoria,Forma:d.forma,"Responsável":d.responsavel,Valor:Number(d.valor),Comprovante:d.comprovante_url})));
   add("Tríduo", triduo.map(t=>({Data:t.data,Noite:t.noite,Grupo:t.grupo,"Descrição":t.descricao,Forma:t.forma,"Responsável":t.responsavel,Valor:Number(t.valor)})));
-  add("Filipetas", filipetas.map(f=>({Data:f.data,Nome:f.nome,Noite:f.noite,Qtd:Number(f.quantidade||1),Valor:Number(f.valor),Forma:f.forma,Status:f.pago?"Pago":"Pendente","Pago em":f.data_pagamento,"Responsável":f.responsavel,"Observação":f.obs})));
+  add("Filipetas", filipetas.map(f=>({Data:f.data,Nome:f.nome,Noite:f.noite,Qtd:Number(f.quantidade||1),Valor:Number(f.valor),Forma:f.forma,Status:f.pago?(f.confirmado?"Confirmado":"Pago"):"Pendente","Pago em":f.data_pagamento,"Responsável":f.responsavel,"Observação":f.obs})));
   add("Camisas", vendas.map(v=>({Data:v.data,Comprador:v.comprador,Tamanho:v.tamanho,Qtd:v.quantidade,"Valor unit.":Number(v.valor_unit),Total:Number(v.valor_total),Pago:Number(v.valor_pago),Falta:Math.max(0,Number(v.valor_total)-Number(v.valor_pago)),"Situação":situacao(v),Forma:v.forma,Entregue:v.entregue?"sim":"não","Entregue em":v.entregue_em,"Obs entrega":v.entrega_obs,"Responsável":v.responsavel,Pagamentos:(Array.isArray(v.pagamentos)?v.pagamentos:[]).map(p=>`${fmtData(p.data)} ${p.forma||""} R$${Number(p.valor).toFixed(2)}`).join(" | ")})));
   const estMap={}; estoque.forEach(e=>{ const k=e.tamanho||"—"; estMap[k]=(estMap[k]||0)+Number(e.quantidade||0); });
   add("Estoque", Object.entries(estMap).map(([t,q])=>({Tamanho:t,Produzida:q,Vendida:vendidasPorTam(t),Entregue:entreguesPorTam(t),Estoque:q-entreguesPorTam(t),"Disponível":q-vendidasPorTam(t)})));
