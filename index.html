@@ -1059,6 +1059,7 @@ async function salvarEntrega(id,entregue,obs,dataEntrega){
 }
 
 /* ---------- TRÍDUO (noites x grupos) ---------- */
+function iconeGrupo(g){ const m={"Barraca":"🍢","Comidas e Bebidas":"🍢","Bazar":"🛍️","Leilão":"🔨","Oferta":"🙏","Rifa":"🎫","Bar":"🍺","Bingo":"🎱","Cozinha":"🍲","Doação":"🎁"}; return m[g]||"📌"; }
 function receitaTriduo(){ return triduo.reduce((s,t)=>s+Number(t.valor||0),0); }
 function fillTriSelects(){
   const on='<option value="">— selecione —</option>'+NOITES.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
@@ -1081,7 +1082,7 @@ function renderTriduo(){
   let top="—",topV=-1; NOITES.forEach(n=>{ const v=totNoite(n); if(v>topV){topV=v;top=n;} });
   $("#triTop").textContent = total>0 ? `${top} · ${brl(topV)}` : "—";
   const head='<tr><th>Grupo</th>'+NOITES.map(n=>`<th class="num">${esc(n)}</th>`).join("")+'<th class="num">Total</th></tr>';
-  let body=GRUPOS_TRIDUO.map(g=>`<tr><td><b>${esc(g)}</b></td>`+NOITES.map(n=>{const v=somaNG(n,g);return `<td class="num">${v?brl(v):"—"}</td>`;}).join("")+`<td class="num" style="font-weight:700">${brl(totGrupo(g))}</td></tr>`).join("");
+  let body=GRUPOS_TRIDUO.map(g=>`<tr><td><b>${iconeGrupo(g)} ${esc(g)}</b></td>`+NOITES.map(n=>{const v=somaNG(n,g);return `<td class="num">${v?brl(v):"—"}</td>`;}).join("")+`<td class="num" style="font-weight:700">${brl(totGrupo(g))}</td></tr>`).join("");
   body+=`<tr><td><b>🎟️ Filipetas</b></td>`+NOITES.map(n=>{const v=filNoite(n);return `<td class="num">${v?brl(v):"—"}</td>`;}).join("")+`<td class="num" style="font-weight:700">${brl(totalFil)}</td></tr>`;
   const foot='<tr style="font-weight:700;background:#f7f9fb"><td>Total</td>'+NOITES.map(n=>`<td class="num">${brl(totNoite(n))}</td>`).join("")+`<td class="num">${brl(total)}</td></tr>`;
   $("#triMatrizWrap").innerHTML=`<table><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table>`;
