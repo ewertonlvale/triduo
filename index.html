@@ -129,6 +129,21 @@
   .assinaturas{display:grid; grid-template-columns:1fr 1fr; gap:40px; margin-top:40px}
   .assina{border-top:1px solid #333; padding-top:6px; text-align:center; font-size:.82rem}
   @media(max-width:600px){ .cards.c3,.cards.c4,.cards.c5{grid-template-columns:1fr 1fr} form{grid-template-columns:1fr} .rel-grid{grid-template-columns:1fr} }
+  /* Relatórios para impressão/PDF (Filipetas e Leilão) */
+  #filPrint,#leilaoPrint{display:none}
+  #filPrint h1,#leilaoPrint h1{font-size:20px; margin:0 0 4px}
+  #filPrint h2,#leilaoPrint h2{font-size:15px; margin:20px 0 6px; border-bottom:2px solid #333; padding-bottom:3px}
+  #filPrint .meta,#leilaoPrint .meta{font-size:11px; color:#555; margin-bottom:10px}
+  #filPrint table,#leilaoPrint table{width:100%; border-collapse:collapse; font-size:12px; margin-top:4px}
+  #filPrint th,#filPrint td,#leilaoPrint th,#leilaoPrint td{border:1px solid #999; padding:5px 7px; text-align:left}
+  #filPrint th,#leilaoPrint th{background:#eee}
+  #filPrint .pb,#leilaoPrint .pb{page-break-before:always}
+  @media print{
+    body.print-fil header, body.print-fil .wrap{display:none !important}
+    body.print-fil #filPrint{display:block !important}
+    body.print-lei header, body.print-lei .wrap{display:none !important}
+    body.print-lei #leilaoPrint{display:block !important}
+  }
   @media print{
     body{background:#fff}
     header{background:#fff; color:#000; padding:6px 0 0}
@@ -320,6 +335,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <select id="triFiltroNoite"><option value="">Noite: todas</option></select>
       <select id="triFiltroGrupo"><option value="">Grupo: todos</option></select>
       <select id="triFiltroForma"><option value="">Forma: todas</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select>
+      <button class="btn-sec" id="btnLeilaoPdf">🔨 Folha de Leilão (PDF)</button>
     </div>
     <div class="lista">
       <table>
@@ -362,6 +378,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <select id="filFiltroStatus"><option value="">Status: todos</option><option value="pend">Pendente</option><option value="aconfirmar">Pago (a confirmar)</option><option value="confirmado">Confirmado</option><option value="pago">Todos pagos</option></select>
       <select id="filFiltroForma"><option value="">Forma: todas</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select>
       <button class="btn-sec" id="btnLimparFil">✕ Limpar</button>
+      <button class="btn-sec" id="btnFilPdf">🖨️ Relatório PDF</button>
     </div>
     <div class="lista">
       <table>
@@ -575,6 +592,9 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
   </footer>
 </div>
 
+<div id="filPrint"></div>
+<div id="leilaoPrint"></div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="config.js"></script>
@@ -646,6 +666,7 @@ function ligarEventos(){
   $("#btnCancelFil").onclick=cancelarEdicaoFil;
   $("#filBusca").oninput=renderFilipetas; $("#filFiltroNoite").onchange=renderFilipetas; $("#filFiltroStatus").onchange=renderFilipetas; $("#filFiltroForma").onchange=renderFilipetas;
   $("#btnLimparFil").onclick=()=>{ ["#filBusca","#filFiltroNoite","#filFiltroStatus","#filFiltroForma"].forEach(s=>{ if($(s))$(s).value=""; }); renderFilipetas(); };
+  $("#btnFilPdf").onclick=relatorioFilipetasPDF;
   $("#filCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],[data-baixa],[data-confirmar],[data-desconfirmar],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir esta filipeta?")) delFrom("filipetas",t.dataset.id); } else if(t.dataset.confirmar){ confirmarFil(t.dataset.confirmar,true); } else if(t.dataset.desconfirmar){ confirmarFil(t.dataset.desconfirmar,false); } else if(t.dataset.baixa){ baixaFil(t.dataset.baixa); } else if(t.dataset.edit){ editarFil(t.dataset.edit); } };
   $("#reembCorpo").onclick=e=>{ const t=e.target;
     if(t.classList.contains("del")){ if(confirm("Excluir este reembolso?")) delFrom("reembolsos",t.dataset.id); return; }
@@ -673,6 +694,7 @@ function ligarEventos(){
   $("#btnNovoTri").onclick=()=>$("#painelTri").classList.toggle("hide");
   $("#btnCancelTri").onclick=cancelarEdicaoTri;
   $("#triBusca").oninput=renderTriduo; $("#triFiltroNoite").onchange=renderTriduo; $("#triFiltroGrupo").onchange=renderTriduo; $("#triFiltroForma").onchange=renderTriduo;
+  $("#btnLeilaoPdf").onclick=folhaLeilaoPDF;
   $("#triCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir este lançamento?")) delFrom("triduo_lancamentos",t.dataset.id); } else if(t.dataset.edit){ editarTri(t.dataset.edit); } };
   fillTriSelects();
 }
@@ -1178,6 +1200,42 @@ function cancelarEdicaoFil(){ editFilId=null; $("#btnCancelFil").classList.add("
 function editarFil(id){ const f=filipetas.find(x=>x.id===id); if(!f)return; editFilId=id; fillFilSelects();
   $("#filNome").value=f.nome||""; $("#filNoite").value=f.noite||""; $("#filQtdInput").value=f.quantidade||1; $("#filValor").value=f.valor; $("#filForma").value=f.forma||""; $("#filData").value=f.data||hoje(); $("#filResp").value=f.responsavel||""; $("#filObs").value=f.obs||""; $("#filPago").checked=!!f.pago;
   $("#painelFil").classList.remove("hide"); $("#btnAddFil").textContent="Salvar alterações"; $("#btnCancelFil").classList.remove("hide"); $("#painelFil").scrollIntoView({behavior:"smooth",block:"center"}); }
+function folhaLeilaoPDF(){
+  let rows=""; for(let i=0;i<26;i++){ rows+=`<tr><td style="height:26px"></td><td></td><td></td><td></td><td></td></tr>`; }
+  $("#leilaoPrint").innerHTML=`
+    <h1 style="text-align:center">LEILÃO — Comunidade Nossa Senhora do Desterro</h1>
+    <div class="meta" style="text-align:center">Data: ____/____/______      ·      Noite: ______________________</div>
+    <table>
+      <thead><tr><th>ARREMATANTE</th><th>JOIA</th><th style="width:95px;text-align:center">ESPÉCIE</th><th style="width:95px;text-align:center">PIX</th><th style="width:95px;text-align:center">CARTÃO</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  document.body.classList.add("print-lei");
+  window.print();
+  setTimeout(()=>document.body.classList.remove("print-lei"),800);
+}
+function relatorioFilipetasPDF(){
+  const dataStr=new Date().toLocaleDateString("pt-BR");
+  const total=filipetas.filter(f=>f.pago).reduce((s,f)=>s+Number(f.valor||0),0);
+  const qtdTot=filipetas.reduce((s,f)=>s+Number(f.quantidade||1),0);
+  const lista=[...filipetas].sort((a,b)=>(a.nome||"").localeCompare(b.nome||""));
+  const status=f=>f.pago?(f.confirmado?"Confirmado":"Pago"):"Pendente";
+  const rows=lista.map((f,i)=>`<tr><td>${i+1}</td><td>${esc(f.nome)||"—"}</td><td>${esc(f.noite)||"—"}</td><td style="text-align:center">${f.quantidade||1}</td><td style="text-align:right">${brl(f.valor)}</td><td>${esc(f.forma)||"—"}</td><td>${status(f)}</td></tr>`).join("");
+  let blank=""; for(let i=0;i<22;i++){ blank+=`<tr><td style="height:28px"></td><td></td><td></td><td></td><td></td><td></td></tr>`; }
+  $("#filPrint").innerHTML=`
+    <h1>🎟️ Filipetas — Controle do Tríduo</h1>
+    <div class="meta">Gerado em ${dataStr} · ${filipetas.length} registro(s) · ${qtdTot} filipeta(s) · Arrecadado (pago): ${brl(total)}</div>
+    <h2>Filipetas cadastradas</h2>
+    <table><thead><tr><th style="width:28px">#</th><th>Nome</th><th>Noite</th><th style="width:44px">Qtd</th><th style="width:90px">Valor</th><th style="width:80px">Forma</th><th style="width:90px">Status</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="7" style="text-align:center;color:#777">Nenhuma filipeta cadastrada.</td></tr>'}</tbody></table>
+    <div class="pb"></div>
+    <h1>🎟️ Filipetas — Folha para preencher à mão</h1>
+    <div class="meta">Anote aqui durante o evento e depois lance no app.</div>
+    <table><thead><tr><th>Nome</th><th style="width:110px">Noite</th><th style="width:44px">Qtd</th><th style="width:90px">Valor</th><th style="width:90px">Forma</th><th style="width:70px">Pago?</th></tr></thead>
+      <tbody>${blank}</tbody></table>`;
+  document.body.classList.add("print-fil");
+  window.print();
+  setTimeout(()=>document.body.classList.remove("print-fil"),800);
+}
 async function baixaFil(id){ const f=filipetas.find(x=>x.id===id); if(!f)return; const novo=!f.pago; const {error}=await sb.from("filipetas").update({pago:novo,data_pagamento:novo?hoje():null,confirmado:novo?!!f.confirmado:false}).eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
 async function confirmarFil(id,val){ const {error}=await sb.from("filipetas").update({confirmado:val}).eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
 
