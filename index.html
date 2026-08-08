@@ -143,6 +143,7 @@
   <div class="tabs hide" id="tabs">
     <button data-tab="fin" class="ativa">💰 Financeiro</button>
     <button data-tab="tri">⛪ Tríduo</button>
+    <button data-tab="fil">🎟️ Filipetas</button>
     <button data-tab="cam">👕 Camisas</button>
     <button data-tab="rel">📊 Relatório</button>
     <button data-tab="cfg">⚙️ Config</button>
@@ -318,6 +319,46 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <tfoot><tr><td colspan="6">Total (filtro atual)</td><td class="valor" id="triFoot">R$ 0,00</td><td colspan="2"></td></tr></tfoot>
       </table>
       <div class="vazio" id="triVazio">Nenhum lançamento ainda.</div>
+    </div>
+  </div>
+
+  <!-- ===== ABA FILIPETAS ===== -->
+  <div id="app-fil" class="hide">
+    <div class="cards c3">
+      <div class="card rec"><div class="rot">Arrecadado</div><div class="val" id="filArrec">R$ 0,00</div></div>
+      <div class="card alerta"><div class="rot">A receber</div><div class="val" id="filFalta">R$ 0,00</div></div>
+      <div class="card info"><div class="rot">Filipetas</div><div class="val" id="filQtd">0</div></div>
+    </div>
+    <button class="btn-add" id="btnNovoFil" style="margin:0 0 14px">➕ Nova filipeta</button>
+    <div class="painel hide" id="painelFil">
+      <h2>Nova filipeta</h2>
+      <form id="formFil">
+        <div class="campo full"><label for="filNome">Nome da pessoa</label><input type="text" id="filNome" placeholder="Quem ficou com a filipeta"></div>
+        <div class="campo"><label for="filNoite">Noite</label><select id="filNoite"></select></div>
+        <div class="campo"><label for="filValor">Valor (R$)</label><input type="number" id="filValor" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
+        <div class="campo"><label for="filForma">Forma de pagamento</label><select id="filForma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
+        <div class="campo"><label for="filData">Data</label><input type="date" id="filData" required></div>
+        <div class="campo"><label for="filResp">Responsável</label><input type="text" id="filResp" placeholder="Quem registrou"></div>
+        <div class="campo check full"><input type="checkbox" id="filPago"><label for="filPago" style="font-weight:600">Já pago</label></div>
+        <div class="campo full"><label for="filObs">Observação (opcional)</label><input type="text" id="filObs" placeholder="Ex.: retira no domingo"></div>
+        <button type="submit" class="btn-add" id="btnAddFil">+ Adicionar filipeta</button>
+        <button type="button" class="btn-add hide" id="btnCancelFil" style="background:#7a8896">Cancelar edição</button>
+      </form>
+    </div>
+    <div class="barra">
+      <input type="text" id="filBusca" placeholder="🔍 Nome...">
+      <select id="filFiltroNoite"><option value="">Noite: todas</option></select>
+      <select id="filFiltroStatus"><option value="">Status: todos</option><option value="pago">Pago</option><option value="pend">Pendente</option></select>
+      <select id="filFiltroForma"><option value="">Forma: todas</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select>
+      <button class="btn-sec" id="btnLimparFil">✕ Limpar</button>
+    </div>
+    <div class="lista">
+      <table>
+        <thead><tr><th>Data</th><th>Nome</th><th>Noite</th><th class="num">Valor</th><th>Forma</th><th>Status</th><th>Pago em</th><th></th><th></th></tr></thead>
+        <tbody id="filCorpo"></tbody>
+        <tfoot><tr><td colspan="3">Arrecadado (filtro)</td><td class="num" id="filFootValor">R$ 0,00</td><td colspan="5"></td></tr></tfoot>
+      </table>
+      <div class="vazio" id="filVazio">Nenhuma filipeta registrada.</div>
     </div>
   </div>
 
@@ -539,8 +580,8 @@ const GRUPOS_TRIDUO = (Array.isArray(_CFG.GRUPOS_TRIDUO) && _CFG.GRUPOS_TRIDUO.l
 
 const LS="triduo_supabase_cfg";
 let sb=null, tipo="receita";
-let categorias=[], fin=[], estoque=[], vendas=[], triduo=[], transferencias=[], reembolsos=[];
-let editFinId=null, editTriId=null;
+let categorias=[], fin=[], estoque=[], vendas=[], triduo=[], transferencias=[], reembolsos=[], filipetas=[];
+let editFinId=null, editTriId=null, editFilId=null;
 let _appIniciado=false, _inscrito=false, _carregando=false, _recarregar=false;
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const brl=n=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
@@ -549,7 +590,7 @@ const hoje=()=>new Date().toISOString().slice(0,10);
 function getCfg(){ if(SUPABASE_URL&&SUPABASE_ANON_KEY) return {url:SUPABASE_URL,key:SUPABASE_ANON_KEY}; try{ return JSON.parse(localStorage.getItem(LS)) }catch(e){ return null } }
 function setStatus(e,t){ const d=$("#dot"); d.className="dot"+(e==="on"?" on":e==="off"?" off":""); $("#statusTxt").textContent=t; }
 
-$$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("ativa")); b.classList.add("ativa"); const t=b.dataset.tab; $("#app-fin").classList.toggle("hide",t!=="fin"); $("#app-tri").classList.toggle("hide",t!=="tri"); $("#app-cam").classList.toggle("hide",t!=="cam"); $("#app-rel").classList.toggle("hide",t!=="rel"); $("#app-cfg").classList.toggle("hide",t!=="cfg"); if(t==="rel") renderRelatorio(); if(t==="tri") renderTriduo(); });
+$$("#tabs button").forEach(b=>b.onclick=()=>{ $$("#tabs button").forEach(x=>x.classList.remove("ativa")); b.classList.add("ativa"); const t=b.dataset.tab; $("#app-fin").classList.toggle("hide",t!=="fin"); $("#app-tri").classList.toggle("hide",t!=="tri"); $("#app-fil").classList.toggle("hide",t!=="fil"); $("#app-cam").classList.toggle("hide",t!=="cam"); $("#app-rel").classList.toggle("hide",t!=="rel"); $("#app-cfg").classList.toggle("hide",t!=="cfg"); if(t==="rel") renderRelatorio(); if(t==="tri") renderTriduo(); if(t==="fil") renderFilipetas(); });
 
 async function iniciar(){
   const cfg=getCfg();
@@ -563,12 +604,12 @@ async function iniciar(){
   }catch(e){ mostrarLogin(); }
   try{ sb.auth.onAuthStateChange((_e,s)=>{ if(s) mostrarApp(); else mostrarLogin(); }); }catch(e){}
 }
-function mostrarLogin(){ setStatus("off","Faça login"); $("#login").classList.remove("hide"); $("#tabs").classList.add("hide"); $("#btnSair").classList.add("hide"); $("#app-fin").classList.add("hide"); $("#app-tri").classList.add("hide"); $("#app-cam").classList.add("hide"); $("#app-rel").classList.add("hide"); $("#app-cfg").classList.add("hide"); }
+function mostrarLogin(){ setStatus("off","Faça login"); $("#login").classList.remove("hide"); $("#tabs").classList.add("hide"); $("#btnSair").classList.add("hide"); $("#app-fin").classList.add("hide"); $("#app-tri").classList.add("hide"); $("#app-fil").classList.add("hide"); $("#app-cam").classList.add("hide"); $("#app-rel").classList.add("hide"); $("#app-cfg").classList.add("hide"); }
 function mostrarApp(){
   $("#login").classList.add("hide"); $("#tabs").classList.remove("hide"); $("#btnSair").classList.remove("hide"); $("#app-fin").classList.remove("hide");
   if(_appIniciado) return;            // evita reinicializar a cada evento de login (não empilha assinaturas)
   _appIniciado=true;
-  $("#data").value=hoje(); $("#vData").value=hoje(); $("#triData").value=hoje(); if($("#tData"))$("#tData").value=hoje(); if($("#rData"))$("#rData").value=hoje(); carregarTudo(); assinar();
+  $("#data").value=hoje(); $("#vData").value=hoje(); $("#triData").value=hoje(); if($("#tData"))$("#tData").value=hoje(); if($("#rData"))$("#rData").value=hoje(); if($("#filData"))$("#filData").value=hoje(); carregarTudo(); assinar();
 }
 
 function salvarConfig(){ const url=$("#inpUrl").value.trim().replace(/\/+$/,""), key=$("#inpKey").value.trim(); if(!url||!key){ alert("Preencha os dois campos."); return; } localStorage.setItem(LS,JSON.stringify({url,key})); location.reload(); }
@@ -588,6 +629,12 @@ function ligarEventos(){
   $("#transfCorpo").onclick=e=>{ if(e.target.classList.contains("del")&&confirm("Excluir esta transferência?")) delFrom("transferencias",e.target.dataset.id); };
   $("#reembLink").onclick=e=>{ e.preventDefault(); document.querySelector('#tabs button[data-tab="cfg"]').click(); };
   $("#formReemb").onsubmit=addReemb;
+  $("#formFil").onsubmit=addFil;
+  $("#btnNovoFil").onclick=()=>$("#painelFil").classList.toggle("hide");
+  $("#btnCancelFil").onclick=cancelarEdicaoFil;
+  $("#filBusca").oninput=renderFilipetas; $("#filFiltroNoite").onchange=renderFilipetas; $("#filFiltroStatus").onchange=renderFilipetas; $("#filFiltroForma").onchange=renderFilipetas;
+  $("#btnLimparFil").onclick=()=>{ ["#filBusca","#filFiltroNoite","#filFiltroStatus","#filFiltroForma"].forEach(s=>{ if($(s))$(s).value=""; }); renderFilipetas(); };
+  $("#filCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],[data-baixa],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir esta filipeta?")) delFrom("filipetas",t.dataset.id); } else if(t.dataset.baixa){ baixaFil(t.dataset.baixa); } else if(t.dataset.edit){ editarFil(t.dataset.edit); } };
   $("#reembCorpo").onclick=e=>{ const t=e.target;
     if(t.classList.contains("del")){ if(confirm("Excluir este reembolso?")) delFrom("reembolsos",t.dataset.id); return; }
     if(t.dataset.rss){ const sel=$("#reembCorpo").querySelector('.rss-forma[data-id="'+t.dataset.rss+'"]'); ressarcir(t.dataset.rss, sel?sel.value:"Dinheiro"); return; }
@@ -635,23 +682,24 @@ async function carregarTudo(){
   _carregando=true;
   try{
     setStatus("","Carregando…");
-    const [r0,r1,r2,r3,r4,r5,r6]=await Promise.all([
+    const [r0,r1,r2,r3,r4,r5,r6,r7]=await Promise.all([
       sb.from("categorias").select("*").order("nome"),
       sb.from("lancamentos").select("*").order("data",{ascending:false}).order("created_at",{ascending:false}),
       sb.from("camisas_estoque").select("*").order("created_at",{ascending:false}),
       sb.from("camisas_vendas").select("*").order("data",{ascending:false}).order("created_at",{ascending:false}),
       sb.from("triduo_lancamentos").select("*").order("data",{ascending:false}).order("created_at",{ascending:false}),
       sb.from("transferencias").select("*").order("data",{ascending:false}).order("created_at",{ascending:false}),
-      sb.from("reembolsos").select("*").order("data",{ascending:false}).order("created_at",{ascending:false})
+      sb.from("reembolsos").select("*").order("data",{ascending:false}).order("created_at",{ascending:false}),
+      sb.from("filipetas").select("*").order("data",{ascending:false}).order("created_at",{ascending:false})
     ]);
-    const err=r0.error||r1.error||r2.error||r3.error||r4.error||r5.error||r6.error;
+    const err=r0.error||r1.error||r2.error||r3.error||r4.error||r5.error||r6.error||r7.error;
     if(err){ setStatus("off","Erro ao ler"); console.error("Erro ao ler:",err.message); return; }
-    categorias=r0.data||[]; fin=r1.data||[]; estoque=r2.data||[]; vendas=r3.data||[]; triduo=r4.data||[]; transferencias=r5.data||[]; reembolsos=r6.data||[];
-    setStatus("on","Conectado"); fillCatSelect(); renderCategorias(); renderFin(); renderCamisas(); renderRelatorio(); renderTriduo(); renderTransferencias(); renderReembolsos();
+    categorias=r0.data||[]; fin=r1.data||[]; estoque=r2.data||[]; vendas=r3.data||[]; triduo=r4.data||[]; transferencias=r5.data||[]; reembolsos=r6.data||[]; filipetas=r7.data||[];
+    setStatus("on","Conectado"); fillCatSelect(); renderCategorias(); renderFin(); renderCamisas(); renderRelatorio(); renderTriduo(); renderTransferencias(); renderReembolsos(); renderFilipetas();
   }catch(e){ setStatus("off","Erro"); console.error(e); }
   finally{ _carregando=false; if(_recarregar){ _recarregar=false; carregarTudo(); } }
 }
-function assinar(){ if(_inscrito) return; _inscrito=true; try{ ["categorias","lancamentos","camisas_estoque","camisas_vendas","triduo_lancamentos","transferencias","reembolsos"].forEach(t=> sb.channel("ch_"+t).on("postgres_changes",{event:"*",schema:"public",table:t},()=>carregarTudo()).subscribe()); }catch(e){} }
+function assinar(){ if(_inscrito) return; _inscrito=true; try{ ["categorias","lancamentos","camisas_estoque","camisas_vendas","triduo_lancamentos","transferencias","reembolsos","filipetas"].forEach(t=> sb.channel("ch_"+t).on("postgres_changes",{event:"*",schema:"public",table:t},()=>carregarTudo()).subscribe()); }catch(e){} }
 async function delFrom(tabela,id){ const {error}=await sb.from(tabela).delete().eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
 
 async function subirComprovante(input,prefixo){
@@ -733,6 +781,7 @@ function saldoCaixaDinheiro(){
   triduo.forEach(t=>{ if(isDin(t.forma)) caixa+=Number(t.valor)||0; });
   transferencias.forEach(t=>{ const val=Number(t.valor)||0; if(t.sentido==="caixa_conta") caixa-=val; else caixa+=val; });
   reembolsos.forEach(r=>{ if(r.ressarcido && isDin(r.forma)) caixa-=Number(r.valor)||0; });
+  filipetas.forEach(f=>{ if(f.pago && isDin(f.forma)) caixa+=Number(f.valor)||0; });
   return Math.round(caixa*100)/100;
 }
 function formaTag(f){ if(!f) return ""; const cls=f==="Pix"?"pix":f==="Dinheiro"?"dinheiro":f==="Cartão"?"cartao":""; return `<span class="forma ${cls}">${esc(f)}</span>`; }
@@ -741,7 +790,7 @@ function anexo(url){ return url?`<a class="anexo" href="${url}" target="_blank" 
 function renderFin(){
   const recM=fin.filter(d=>d.tipo==="receita").reduce((s,d)=>s+Number(d.valor),0);
   const desp=fin.filter(d=>d.tipo==="despesa").reduce((s,d)=>s+Number(d.valor),0)+despesaReembolsos();
-  const rec=recM+receitaCamisas()+receitaTriduo();
+  const rec=recM+receitaCamisas()+receitaTriduo()+receitaFilipetas();
   $("#totRec").textContent=brl(rec); $("#totDesp").textContent=brl(desp); $("#totSaldo").textContent=brl(rec-desp);
   $("#cardSaldo").classList.toggle("neg",(rec-desp)<0);
   const caixa=saldoCaixaDinheiro(), conta=(rec-desp)-caixa;
@@ -1022,15 +1071,18 @@ function fillTriSelects(){
 function renderTriduo(){
   if(!$("#triTotal")) return;
   fillTriSelects();
-  const total=receitaTriduo();
+  const filNoite=n=>filipetas.filter(f=>f.pago&&(f.noite||"")===n).reduce((s,f)=>s+Number(f.valor||0),0);
+  const totalFil=receitaFilipetas();
+  const total=receitaTriduo()+totalFil;
   const somaNG=(n,g)=>triduo.filter(t=>t.noite===n&&t.grupo===g).reduce((s,t)=>s+Number(t.valor||0),0);
-  const totNoite=n=>triduo.filter(t=>t.noite===n).reduce((s,t)=>s+Number(t.valor||0),0);
+  const totNoite=n=>triduo.filter(t=>t.noite===n).reduce((s,t)=>s+Number(t.valor||0),0)+filNoite(n);
   const totGrupo=g=>triduo.filter(t=>t.grupo===g).reduce((s,t)=>s+Number(t.valor||0),0);
-  $("#triTotal").textContent=brl(total); $("#triQtd").textContent=triduo.length;
+  $("#triTotal").textContent=brl(total); $("#triQtd").textContent=triduo.length+filipetas.length;
   let top="—",topV=-1; NOITES.forEach(n=>{ const v=totNoite(n); if(v>topV){topV=v;top=n;} });
   $("#triTop").textContent = total>0 ? `${top} · ${brl(topV)}` : "—";
   const head='<tr><th>Grupo</th>'+NOITES.map(n=>`<th class="num">${esc(n)}</th>`).join("")+'<th class="num">Total</th></tr>';
-  const body=GRUPOS_TRIDUO.map(g=>`<tr><td><b>${esc(g)}</b></td>`+NOITES.map(n=>{const v=somaNG(n,g);return `<td class="num">${v?brl(v):"—"}</td>`;}).join("")+`<td class="num" style="font-weight:700">${brl(totGrupo(g))}</td></tr>`).join("");
+  let body=GRUPOS_TRIDUO.map(g=>`<tr><td><b>${esc(g)}</b></td>`+NOITES.map(n=>{const v=somaNG(n,g);return `<td class="num">${v?brl(v):"—"}</td>`;}).join("")+`<td class="num" style="font-weight:700">${brl(totGrupo(g))}</td></tr>`).join("");
+  body+=`<tr><td><b>🎟️ Filipetas</b></td>`+NOITES.map(n=>{const v=filNoite(n);return `<td class="num">${v?brl(v):"—"}</td>`;}).join("")+`<td class="num" style="font-weight:700">${brl(totalFil)}</td></tr>`;
   const foot='<tr style="font-weight:700;background:#f7f9fb"><td>Total</td>'+NOITES.map(n=>`<td class="num">${brl(totNoite(n))}</td>`).join("")+`<td class="num">${brl(total)}</td></tr>`;
   $("#triMatrizWrap").innerHTML=`<table><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table>`;
   const q=$("#triBusca").value.toLowerCase(), fn=$("#triFiltroNoite").value, fg=$("#triFiltroGrupo").value, ff=$("#triFiltroForma")?$("#triFiltroForma").value:"";
@@ -1058,15 +1110,64 @@ function editarTri(id){ const t=triduo.find(x=>x.id===id); if(!t)return; editTri
   $("#triNoite").value=t.noite; $("#triGrupo").value=t.grupo; $("#triDesc").value=t.descricao||""; $("#triValor").value=t.valor; $("#triForma").value=t.forma||""; $("#triResp").value=t.responsavel||""; $("#triData").value=t.data||hoje();
   $("#painelTri").classList.remove("hide"); $("#btnAddTri").textContent="Salvar alterações"; $("#btnCancelTri").classList.remove("hide"); $("#painelTri").scrollIntoView({behavior:"smooth",block:"center"}); }
 
+/* ---------- FILIPETAS ---------- */
+function receitaFilipetas(){ return filipetas.filter(f=>f.pago).reduce((s,f)=>s+Number(f.valor||0),0); }
+function fillFilSelects(){
+  const on='<option value="">— selecione —</option>'+NOITES.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  const s=$("#filNoite"); if(s){ const a=s.value; s.innerHTML=on; if(NOITES.includes(a))s.value=a; }
+  const ff=$("#filFiltroNoite"); if(ff){ const a=ff.value; ff.innerHTML='<option value="">Noite: todas</option>'+NOITES.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join(""); if(NOITES.includes(a))ff.value=a; }
+}
+function renderFilipetas(){
+  if(!$("#filArrec")) return;
+  fillFilSelects();
+  const arrec=filipetas.filter(f=>f.pago).reduce((s,f)=>s+Number(f.valor||0),0);
+  const falta=filipetas.filter(f=>!f.pago).reduce((s,f)=>s+Number(f.valor||0),0);
+  $("#filArrec").textContent=brl(arrec); $("#filFalta").textContent=brl(falta); $("#filQtd").textContent=filipetas.length;
+  const q=$("#filBusca").value.toLowerCase(), fn=$("#filFiltroNoite").value, fst=$("#filFiltroStatus").value, ff=$("#filFiltroForma").value;
+  const lista=filipetas.filter(f=>{
+    if(fn&&(f.noite||"")!==fn) return false;
+    if(fst==="pago"&&!f.pago) return false; if(fst==="pend"&&f.pago) return false;
+    if(ff&&(f.forma||"")!==ff) return false;
+    if(q&&!((f.nome||"")+" "+(f.noite||"")+" "+(f.responsavel||"")+" "+(f.obs||"")).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  $("#filCorpo").innerHTML=lista.map(f=>{
+    const st=f.pago?`<span class="tag pago" data-baixa="${f.id}" title="Clique para desmarcar">Pago</span>`:`<span class="tag pend" data-baixa="${f.id}" title="Clique para dar baixa">Pendente</span>`;
+    return `<tr><td>${fmtData(f.data)}</td><td><b>${esc(f.nome)||"—"}</b>${f.obs?`<div style="font-size:.78rem;color:#7a8896">${esc(f.obs)}</div>`:""}</td><td>${esc(f.noite)||"—"}</td><td class="num">${brl(f.valor)}</td><td>${formaTag(f.forma)||"—"}</td><td>${st}</td><td>${fmtData(f.data_pagamento)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${f.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${f.id}" title="Excluir">🗑</button></td></tr>`;
+  }).join("");
+  $("#filVazio").style.display=lista.length?"none":"block";
+  $("#filFootValor").textContent=brl(lista.filter(f=>f.pago).reduce((s,f)=>s+Number(f.valor||0),0));
+}
+async function addFil(e){
+  e.preventDefault();
+  const v=parseFloat($("#filValor").value);
+  if(isNaN(v)||v<=0){ alert("Informe um valor válido."); return; }
+  const pago=$("#filPago").checked;
+  const reg={nome:$("#filNome").value.trim(),noite:$("#filNoite").value,valor:v,forma:$("#filForma").value,data:$("#filData").value,responsavel:$("#filResp").value.trim(),obs:$("#filObs").value.trim(),pago,data_pagamento:pago?$("#filData").value:null};
+  $("#btnAddFil").disabled=true;
+  let error;
+  if(editFilId){ ({error}=await sb.from("filipetas").update(reg).eq("id",editFilId)); }
+  else { ({error}=await sb.from("filipetas").insert(reg)); }
+  $("#btnAddFil").disabled=false;
+  if(error){ alert("Erro ao salvar: "+error.message); return; }
+  cancelarEdicaoFil(); carregarTudo();
+}
+function cancelarEdicaoFil(){ editFilId=null; $("#btnCancelFil").classList.add("hide"); $("#formFil").reset(); $("#filData").value=hoje(); $("#btnAddFil").textContent="+ Adicionar filipeta"; fillFilSelects(); }
+function editarFil(id){ const f=filipetas.find(x=>x.id===id); if(!f)return; editFilId=id; fillFilSelects();
+  $("#filNome").value=f.nome||""; $("#filNoite").value=f.noite||""; $("#filValor").value=f.valor; $("#filForma").value=f.forma||""; $("#filData").value=f.data||hoje(); $("#filResp").value=f.responsavel||""; $("#filObs").value=f.obs||""; $("#filPago").checked=!!f.pago;
+  $("#painelFil").classList.remove("hide"); $("#btnAddFil").textContent="Salvar alterações"; $("#btnCancelFil").classList.remove("hide"); $("#painelFil").scrollIntoView({behavior:"smooth",block:"center"}); }
+async function baixaFil(id){ const f=filipetas.find(x=>x.id===id); if(!f)return; const novo=!f.pago; const {error}=await sb.from("filipetas").update({pago:novo,data_pagamento:novo?hoje():null}).eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
+
 /* ---------- RELATÓRIO ---------- */
 function renderRelatorio(){
   if(!$("#relData")) return;
   $("#relData").textContent="Gerado em "+new Date().toLocaleString("pt-BR");
   const recCamisas=receitaCamisas();
   const recTri=receitaTriduo();
+  const recFil=receitaFilipetas();
   const recM=fin.filter(d=>d.tipo==="receita").reduce((s,d)=>s+Number(d.valor),0);
   const desp=fin.filter(d=>d.tipo==="despesa").reduce((s,d)=>s+Number(d.valor),0)+despesaReembolsos();
-  const rec=recM+recCamisas+recTri;
+  const rec=recM+recCamisas+recTri+recFil;
   $("#relRec").textContent=brl(rec); $("#relDesp").textContent=brl(desp);
   $("#relSaldo").textContent=brl(rec-desp); $("#relSaldo").style.color=(rec-desp)<0?"var(--vermelho)":"var(--azul)";
   const relCx=saldoCaixaDinheiro(); $("#relCaixa").textContent=brl(relCx); $("#relConta").textContent=brl((rec-desp)-relCx);
@@ -1075,6 +1176,7 @@ function renderRelatorio(){
   const porCat=tp=>{ const m={}; fin.filter(d=>d.tipo===tp).forEach(d=>{ const k=d.categoria||"(sem categoria)"; m[k]=(m[k]||0)+Number(d.valor); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
   const recCats=porCat("receita"); if(recCamisas>0) recCats.push(["👕 Camisas (vendas pagas)",recCamisas]);
   GRUPOS_TRIDUO.forEach(g=>{ const v=triduo.filter(t=>t.grupo===g).reduce((s,t)=>s+Number(t.valor||0),0); if(v>0) recCats.push(["⛪ "+g,v]); });
+  if(recFil>0) recCats.push(["🎟️ Filipetas",recFil]);
   recCats.sort((a,b)=>b[1]-a[1]);
   const linhaCat=(arr,tot)=> (arr.length?arr.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${brl(v)}</td></tr>`).join(""):`<tr><td colspan="2" style="color:#9aa7b2">Nada lançado.</td></tr>`)
     +`<tr><td style="font-weight:700">Total</td><td class="n" style="font-weight:700">${brl(tot)}</td></tr>`;
@@ -1092,6 +1194,7 @@ function renderRelatorio(){
   vendas.forEach(v=>{ if(Number(v.valor_pago)>0){ const k=key(v.forma); ent[k]=(ent[k]||0)+Number(v.valor_pago); } });
   triduo.forEach(t=>{ if(Number(t.valor)>0){ const k=key(t.forma); ent[k]=(ent[k]||0)+Number(t.valor); } });
   reembolsos.forEach(r=>{ if(r.ressarcido){ const k=key(r.forma); sai[k]=(sai[k]||0)+Number(r.valor||0); } });
+  filipetas.forEach(f=>{ if(f.pago){ const k=key(f.forma); ent[k]=(ent[k]||0)+Number(f.valor||0); } });
   const usadas=formas.filter(f=>ent[f]||sai[f]);
   $("#relForma").innerHTML=(usadas.length?usadas.map(f=>`<tr><td>${f}</td><td class="n">${brl(ent[f]||0)}</td><td class="n">${brl(sai[f]||0)}</td></tr>`).join(""):`<tr><td colspan="3" style="color:#9aa7b2">Sem lançamentos.</td></tr>`)
     +`<tr><td style="font-weight:700">Total</td><td class="n" style="font-weight:700">${brl(Object.values(ent).reduce((s,x)=>s+x,0))}</td><td class="n" style="font-weight:700">${brl(Object.values(sai).reduce((s,x)=>s+x,0))}</td></tr>`;
@@ -1171,6 +1274,7 @@ function exportarTudo(){
   const add=(nome,arr)=>{ const ws=XLSX.utils.json_to_sheet(arr.length?arr:[{}]); XLSX.utils.book_append_sheet(wb,ws,nome); };
   add("Financeiro", fin.map(d=>({Data:d.data,Tipo:d.tipo,"Descrição":d.descricao,Detalhamento:d.detalhamento,Categoria:d.categoria,Forma:d.forma,"Responsável":d.responsavel,Valor:Number(d.valor),Comprovante:d.comprovante_url})));
   add("Tríduo", triduo.map(t=>({Data:t.data,Noite:t.noite,Grupo:t.grupo,"Descrição":t.descricao,Forma:t.forma,"Responsável":t.responsavel,Valor:Number(t.valor)})));
+  add("Filipetas", filipetas.map(f=>({Data:f.data,Nome:f.nome,Noite:f.noite,Valor:Number(f.valor),Forma:f.forma,Status:f.pago?"Pago":"Pendente","Pago em":f.data_pagamento,"Responsável":f.responsavel,"Observação":f.obs})));
   add("Camisas", vendas.map(v=>({Data:v.data,Comprador:v.comprador,Tamanho:v.tamanho,Qtd:v.quantidade,"Valor unit.":Number(v.valor_unit),Total:Number(v.valor_total),Pago:Number(v.valor_pago),Falta:Math.max(0,Number(v.valor_total)-Number(v.valor_pago)),"Situação":situacao(v),Forma:v.forma,Entregue:v.entregue?"sim":"não","Entregue em":v.entregue_em,"Obs entrega":v.entrega_obs,"Responsável":v.responsavel,Pagamentos:(Array.isArray(v.pagamentos)?v.pagamentos:[]).map(p=>`${fmtData(p.data)} ${p.forma||""} R$${Number(p.valor).toFixed(2)}`).join(" | ")})));
   const estMap={}; estoque.forEach(e=>{ const k=e.tamanho||"—"; estMap[k]=(estMap[k]||0)+Number(e.quantidade||0); });
   add("Estoque", Object.entries(estMap).map(([t,q])=>({Tamanho:t,Produzida:q,Vendida:vendidasPorTam(t),Entregue:entreguesPorTam(t),Estoque:q-entreguesPorTam(t),"Disponível":q-vendidasPorTam(t)})));
