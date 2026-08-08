@@ -335,7 +335,8 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <form id="formFil">
         <div class="campo full"><label for="filNome">Nome da pessoa</label><input type="text" id="filNome" placeholder="Quem ficou com a filipeta"></div>
         <div class="campo"><label for="filNoite">Noite</label><select id="filNoite"></select></div>
-        <div class="campo"><label for="filValor">Valor (R$)</label><input type="number" id="filValor" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
+        <div class="campo"><label for="filQtdInput">Quantidade</label><input type="number" id="filQtdInput" min="1" step="1" value="1"></div>
+        <div class="campo"><label for="filValor">Valor total (R$)</label><input type="number" id="filValor" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
         <div class="campo"><label for="filForma">Forma de pagamento</label><select id="filForma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
         <div class="campo"><label for="filData">Data</label><input type="date" id="filData" required></div>
         <div class="campo"><label for="filResp">Responsável</label><input type="text" id="filResp" placeholder="Quem registrou"></div>
@@ -354,9 +355,9 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
     </div>
     <div class="lista">
       <table>
-        <thead><tr><th>Data</th><th>Nome</th><th>Noite</th><th class="num">Valor</th><th>Forma</th><th>Status</th><th>Pago em</th><th></th><th></th></tr></thead>
+        <thead><tr><th>Data</th><th>Nome</th><th>Noite</th><th class="num">Qtd</th><th class="num">Valor</th><th>Forma</th><th>Status</th><th>Pago em</th><th></th><th></th></tr></thead>
         <tbody id="filCorpo"></tbody>
-        <tfoot><tr><td colspan="3">Arrecadado (filtro)</td><td class="num" id="filFootValor">R$ 0,00</td><td colspan="5"></td></tr></tfoot>
+        <tfoot><tr><td colspan="3">Total (filtro)</td><td class="num" id="filFootQtd">0</td><td class="num" id="filFootValor">R$ 0,00</td><td colspan="5"></td></tr></tfoot>
       </table>
       <div class="vazio" id="filVazio">Nenhuma filipeta registrada.</div>
     </div>
@@ -1123,7 +1124,7 @@ function renderFilipetas(){
   fillFilSelects();
   const arrec=filipetas.filter(f=>f.pago).reduce((s,f)=>s+Number(f.valor||0),0);
   const falta=filipetas.filter(f=>!f.pago).reduce((s,f)=>s+Number(f.valor||0),0);
-  $("#filArrec").textContent=brl(arrec); $("#filFalta").textContent=brl(falta); $("#filQtd").textContent=filipetas.length;
+  $("#filArrec").textContent=brl(arrec); $("#filFalta").textContent=brl(falta); $("#filQtd").textContent=filipetas.reduce((s,f)=>s+Number(f.quantidade||1),0);
   const q=$("#filBusca").value.toLowerCase(), fn=$("#filFiltroNoite").value, fst=$("#filFiltroStatus").value, ff=$("#filFiltroForma").value;
   const lista=filipetas.filter(f=>{
     if(fn&&(f.noite||"")!==fn) return false;
@@ -1134,9 +1135,10 @@ function renderFilipetas(){
   });
   $("#filCorpo").innerHTML=lista.map(f=>{
     const st=f.pago?`<span class="tag pago" data-baixa="${f.id}" title="Clique para desmarcar">Pago</span>`:`<span class="tag pend" data-baixa="${f.id}" title="Clique para dar baixa">Pendente</span>`;
-    return `<tr><td>${fmtData(f.data)}</td><td><b>${esc(f.nome)||"—"}</b>${f.obs?`<div style="font-size:.78rem;color:#7a8896">${esc(f.obs)}</div>`:""}</td><td>${esc(f.noite)||"—"}</td><td class="num">${brl(f.valor)}</td><td>${formaTag(f.forma)||"—"}</td><td>${st}</td><td>${fmtData(f.data_pagamento)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${f.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${f.id}" title="Excluir">🗑</button></td></tr>`;
+    return `<tr><td>${fmtData(f.data)}</td><td><b>${esc(f.nome)||"—"}</b>${f.obs?`<div style="font-size:.78rem;color:#7a8896">${esc(f.obs)}</div>`:""}</td><td>${esc(f.noite)||"—"}</td><td class="num">${f.quantidade||1}</td><td class="num">${brl(f.valor)}</td><td>${formaTag(f.forma)||"—"}</td><td>${st}</td><td>${fmtData(f.data_pagamento)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${f.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${f.id}" title="Excluir">🗑</button></td></tr>`;
   }).join("");
   $("#filVazio").style.display=lista.length?"none":"block";
+  $("#filFootQtd").textContent=lista.reduce((s,f)=>s+Number(f.quantidade||1),0);
   $("#filFootValor").textContent=brl(lista.filter(f=>f.pago).reduce((s,f)=>s+Number(f.valor||0),0));
 }
 async function addFil(e){
@@ -1144,7 +1146,7 @@ async function addFil(e){
   const v=parseFloat($("#filValor").value);
   if(isNaN(v)||v<=0){ alert("Informe um valor válido."); return; }
   const pago=$("#filPago").checked;
-  const reg={nome:$("#filNome").value.trim(),noite:$("#filNoite").value,valor:v,forma:$("#filForma").value,data:$("#filData").value,responsavel:$("#filResp").value.trim(),obs:$("#filObs").value.trim(),pago,data_pagamento:pago?$("#filData").value:null};
+  const reg={nome:$("#filNome").value.trim(),noite:$("#filNoite").value,quantidade:Math.max(1,parseInt($("#filQtdInput").value)||1),valor:v,forma:$("#filForma").value,data:$("#filData").value,responsavel:$("#filResp").value.trim(),obs:$("#filObs").value.trim(),pago,data_pagamento:pago?$("#filData").value:null};
   $("#btnAddFil").disabled=true;
   let error;
   if(editFilId){ ({error}=await sb.from("filipetas").update(reg).eq("id",editFilId)); }
@@ -1155,7 +1157,7 @@ async function addFil(e){
 }
 function cancelarEdicaoFil(){ editFilId=null; $("#btnCancelFil").classList.add("hide"); $("#formFil").reset(); $("#filData").value=hoje(); $("#btnAddFil").textContent="+ Adicionar filipeta"; fillFilSelects(); }
 function editarFil(id){ const f=filipetas.find(x=>x.id===id); if(!f)return; editFilId=id; fillFilSelects();
-  $("#filNome").value=f.nome||""; $("#filNoite").value=f.noite||""; $("#filValor").value=f.valor; $("#filForma").value=f.forma||""; $("#filData").value=f.data||hoje(); $("#filResp").value=f.responsavel||""; $("#filObs").value=f.obs||""; $("#filPago").checked=!!f.pago;
+  $("#filNome").value=f.nome||""; $("#filNoite").value=f.noite||""; $("#filQtdInput").value=f.quantidade||1; $("#filValor").value=f.valor; $("#filForma").value=f.forma||""; $("#filData").value=f.data||hoje(); $("#filResp").value=f.responsavel||""; $("#filObs").value=f.obs||""; $("#filPago").checked=!!f.pago;
   $("#painelFil").classList.remove("hide"); $("#btnAddFil").textContent="Salvar alterações"; $("#btnCancelFil").classList.remove("hide"); $("#painelFil").scrollIntoView({behavior:"smooth",block:"center"}); }
 async function baixaFil(id){ const f=filipetas.find(x=>x.id===id); if(!f)return; const novo=!f.pago; const {error}=await sb.from("filipetas").update({pago:novo,data_pagamento:novo?hoje():null}).eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
 
@@ -1275,7 +1277,7 @@ function exportarTudo(){
   const add=(nome,arr)=>{ const ws=XLSX.utils.json_to_sheet(arr.length?arr:[{}]); XLSX.utils.book_append_sheet(wb,ws,nome); };
   add("Financeiro", fin.map(d=>({Data:d.data,Tipo:d.tipo,"Descrição":d.descricao,Detalhamento:d.detalhamento,Categoria:d.categoria,Forma:d.forma,"Responsável":d.responsavel,Valor:Number(d.valor),Comprovante:d.comprovante_url})));
   add("Tríduo", triduo.map(t=>({Data:t.data,Noite:t.noite,Grupo:t.grupo,"Descrição":t.descricao,Forma:t.forma,"Responsável":t.responsavel,Valor:Number(t.valor)})));
-  add("Filipetas", filipetas.map(f=>({Data:f.data,Nome:f.nome,Noite:f.noite,Valor:Number(f.valor),Forma:f.forma,Status:f.pago?"Pago":"Pendente","Pago em":f.data_pagamento,"Responsável":f.responsavel,"Observação":f.obs})));
+  add("Filipetas", filipetas.map(f=>({Data:f.data,Nome:f.nome,Noite:f.noite,Qtd:Number(f.quantidade||1),Valor:Number(f.valor),Forma:f.forma,Status:f.pago?"Pago":"Pendente","Pago em":f.data_pagamento,"Responsável":f.responsavel,"Observação":f.obs})));
   add("Camisas", vendas.map(v=>({Data:v.data,Comprador:v.comprador,Tamanho:v.tamanho,Qtd:v.quantidade,"Valor unit.":Number(v.valor_unit),Total:Number(v.valor_total),Pago:Number(v.valor_pago),Falta:Math.max(0,Number(v.valor_total)-Number(v.valor_pago)),"Situação":situacao(v),Forma:v.forma,Entregue:v.entregue?"sim":"não","Entregue em":v.entregue_em,"Obs entrega":v.entrega_obs,"Responsável":v.responsavel,Pagamentos:(Array.isArray(v.pagamentos)?v.pagamentos:[]).map(p=>`${fmtData(p.data)} ${p.forma||""} R$${Number(p.valor).toFixed(2)}`).join(" | ")})));
   const estMap={}; estoque.forEach(e=>{ const k=e.tamanho||"—"; estMap[k]=(estMap[k]||0)+Number(e.quantidade||0); });
   add("Estoque", Object.entries(estMap).map(([t,q])=>({Tamanho:t,Produzida:q,Vendida:vendidasPorTam(t),Entregue:entreguesPorTam(t),Estoque:q-entreguesPorTam(t),"Disponível":q-vendidasPorTam(t)})));
