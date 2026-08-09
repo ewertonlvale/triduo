@@ -78,8 +78,20 @@ create table if not exists filipetas (
   nome text, noite text, quantidade int not null default 1, valor numeric not null, forma text,
   pago boolean not null default false, confirmado boolean not null default false,
   data date not null default current_date,
-  data_pagamento date, obs text, responsavel text,
+  data_pagamento date, obs text, responsavel text, conta text,
   created_at timestamptz default now());
+
+create table if not exists contas (
+  id uuid primary key default gen_random_uuid(),
+  nome text not null, created_at timestamptz default now());
+
+-- Coluna "conta" nos módulos (para Pix/Cartão) e De/Para nas transferências
+alter table lancamentos add column if not exists conta text;
+alter table triduo_lancamentos add column if not exists conta text;
+alter table filipetas add column if not exists conta text;
+alter table reembolsos add column if not exists conta text;
+alter table transferencias add column if not exists conta_de text;
+alter table transferencias add column if not exists conta_para text;
 
 -- Segurança: só usuários logados acessam
 alter table categorias enable row level security;
@@ -90,7 +102,9 @@ alter table triduo_lancamentos enable row level security;
 alter table transferencias enable row level security;
 alter table reembolsos enable row level security;
 alter table filipetas enable row level security;
+alter table contas enable row level security;
 create policy "logados" on categorias for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
+create policy "logados" on contas for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
 create policy "logados" on lancamentos for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
 create policy "logados" on camisas_estoque for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
 create policy "logados" on camisas_vendas for all using (auth.role()='authenticated') with check (auth.role()='authenticated');
