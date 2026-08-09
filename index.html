@@ -1093,7 +1093,7 @@ async function salvarEntrega(id,entregue,obs,dataEntrega){
 }
 
 /* ---------- TRÍDUO (noites x grupos) ---------- */
-function iconeGrupo(g){ const m={"Barraca":"🍢","Comidas e Bebidas":"🍢","Bazar":"🛍️","Leilão":"🔨","Oferta":"🙏","Rifa":"🎫","Bar":"🍺","Bingo":"🎱","Cozinha":"🍲","Doação":"🎁"}; return m[g]||"📌"; }
+function iconeGrupo(g){ const m={"Barraca":"🍢","Comidas e Bebidas":"🍢","Bazar":"🛍️","Leilão":"🔨","Oferta":"🙏","Rifa":"🎫","Bar":"🍺","Bingo":"🎱","Cozinha":"🍲","Doação":"🎁","Doações":"🎁","Filipetas":"🎟️","Camisas":"👕"}; return m[g]||"📌"; }
 function receitaTriduo(){ return triduo.reduce((s,t)=>s+Number(t.valor||0),0); }
 function fillTriSelects(){
   const on='<option value="">— selecione —</option>'+NOITES.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
@@ -1254,14 +1254,14 @@ function renderRelatorio(){
 
   // por categoria
   const porCat=tp=>{ const m={}; fin.filter(d=>d.tipo===tp).forEach(d=>{ const k=d.categoria||"(sem categoria)"; m[k]=(m[k]||0)+Number(d.valor); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
-  const recCats=porCat("receita"); if(recCamisas>0) recCats.push(["👕 Camisas (vendas pagas)",recCamisas]);
-  GRUPOS_TRIDUO.forEach(g=>{ const v=triduo.filter(t=>t.grupo===g).reduce((s,t)=>s+Number(t.valor||0),0); if(v>0) recCats.push(["⛪ "+g,v]); });
+  const recCats=porCat("receita").map(([k,v])=>[iconeGrupo(k)+" "+k,v]); if(recCamisas>0) recCats.push(["👕 Camisas (vendas pagas)",recCamisas]);
+  GRUPOS_TRIDUO.forEach(g=>{ const v=triduo.filter(t=>t.grupo===g).reduce((s,t)=>s+Number(t.valor||0),0); if(v>0) recCats.push([iconeGrupo(g)+" "+g,v]); });
   if(recFil>0) recCats.push(["🎟️ Filipetas",recFil]);
   recCats.sort((a,b)=>b[1]-a[1]);
   const linhaCat=(arr,tot)=> (arr.length?arr.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${brl(v)}</td></tr>`).join(""):`<tr><td colspan="2" style="color:#9aa7b2">Nada lançado.</td></tr>`)
     +`<tr><td style="font-weight:700">Total</td><td class="n" style="font-weight:700">${brl(tot)}</td></tr>`;
   $("#relRecCat").innerHTML=linhaCat(recCats,rec);
-  const despCats=porCat("despesa");
+  const despCats=porCat("despesa").map(([k,v])=>[iconeGrupo(k)+" "+k,v]);
   const reembMap={}; reembolsos.filter(r=>r.ressarcido).forEach(r=>{ const k="💸 "+(r.categoria||"Reembolso")+(r.pessoa?" ("+r.pessoa+")":""); reembMap[k]=(reembMap[k]||0)+Number(r.valor||0); });
   Object.entries(reembMap).forEach(([k,v])=>despCats.push([k,v])); despCats.sort((a,b)=>b[1]-a[1]);
   $("#relDespCat").innerHTML=linhaCat(despCats,desp);
