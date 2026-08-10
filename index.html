@@ -550,6 +550,12 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
     </div>
 
     <div class="painel">
+      <h2>🏦 Extrato por conta (Excel)</h2>
+      <p style="font-size:.82rem;color:#7a8896;margin:0 0 12px">Gera uma planilha com <b>uma aba por conta bancária</b>, listando todos os movimentos em ordem de data (Pix/Cartão de receitas, tríduo, filipetas, camisas, reembolsos e transferências), com colunas de <b>Entrada</b>, <b>Saída</b> e <b>Saldo acumulado</b> — no estilo de um extrato bancário, ideal para conferir com o banco.</p>
+      <button class="btn-add" id="btnExportExtratos" style="margin:0">⬇ Baixar extrato das contas</button>
+    </div>
+
+    <div class="painel">
       <h2>🏷️ Categorias</h2>
       <form id="formCat" style="grid-template-columns:2fr 1fr auto">
         <div class="campo"><label for="catNome">Nova categoria</label><input type="text" id="catNome" placeholder="Ex.: Cozinha, Bar, Doação" required></div>
@@ -687,6 +693,7 @@ function ligarEventos(){
   $("#btnLimparFin").onclick=()=>{ ["#busca","#filtroTipo","#filtroFormaFin","#filtroContaFin","#filtroCatFin","#filtroDataDe","#filtroDataAte"].forEach(s=>{ if($(s))$(s).value=""; }); renderFin(); };
   $("#btnReload").onclick=carregarTudo; $("#formFin").onsubmit=addFin;
   $("#btnExportTudo").onclick=exportarTudo;
+  $("#btnExportExtratos").onclick=exportarExtratos;
   $("#formTransf").onsubmit=addTransf;
   $("#transfCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir esta transferência?")) delFrom("transferencias",t.dataset.id); } else if(t.dataset.edit){ editarTransf(t.dataset.edit); } };
   $("#btnCancelTransf").onclick=cancelarEdicaoTransf;
@@ -1459,6 +1466,33 @@ function exportarTudo(){
   add("Transferências", transferencias.map(t=>({ID:t.id,Data:t.data,De:t.conta_de||"Caixa",Para:t.conta_para||"Caixa",Valor:Number(t.valor),Identificador:t.identificador,"Observação":t.obs})));
   add("Reembolsos", reembolsos.map(r=>({ID:r.id,Data:r.data,"Quem pagou":r.pessoa,"Descrição":r.descricao,Categoria:r.categoria,Valor:Number(r.valor),Status:r.ressarcido?"Ressarcido":"Pendente",Forma:r.forma,Conta:r.conta,"Ressarcido em":r.data_ressarcimento,Comprovante:r.comprovante_url})));
   XLSX.writeFile(wb, "triduo-completo-"+hoje()+".xlsx");
+}
+function exportarExtratos(){
+  if(typeof XLSX==="undefined"){ alert("Biblioteca de Excel não carregou. Verifique a internet e recarregue."); return; }
+  if(!contas.length){ alert("Nenhuma conta bancária cadastrada. Cadastre uma conta em Config → Contas bancárias."); return; }
+  const wb=XLSX.utils.book_new(); const nd=f=>!ehDin(f); const usados={};
+  contas.forEach(c=>{
+    const nome=c.nome, mov=[];
+    fin.forEach(d=>{ if(nd(d.forma)&&(d.conta||"")===nome){ const val=Number(d.valor)||0; const rec=d.tipo==="receita"; mov.push({data:d.data,hist:rec?"Receita":"Despesa",desc:d.descricao||"",ident:d.identificador||"",ent:rec?val:0,sai:rec?0:val}); } });
+    triduo.forEach(t=>{ if(nd(t.forma)&&(t.conta||"")===nome){ const val=Number(t.valor)||0; mov.push({data:t.data,hist:"Tríduo "+(t.grupo||""),desc:[t.noite,t.descricao].filter(Boolean).join(" · "),ident:t.identificador||"",ent:val,sai:0}); } });
+    filipetas.forEach(f=>{ if(f.pago&&nd(f.forma)&&(f.conta||"")===nome){ const val=Number(f.valor)||0; mov.push({data:f.data_pagamento||f.data,hist:"Filipeta",desc:[f.nome,f.noite].filter(Boolean).join(" · "),ident:f.identificador||"",ent:val,sai:0}); } });
+    vendas.forEach(v=>{ (Array.isArray(v.pagamentos)?v.pagamentos:[]).forEach(p=>{ if(nd(p.forma)&&(p.conta||"")===nome){ const val=Number(p.valor)||0; mov.push({data:p.data,hist:"Camisa",desc:[v.comprador,v.tamanho].filter(Boolean).join(" · "),ident:p.ident||"",ent:val,sai:0}); } }); });
+    reembolsos.forEach(r=>{ if(r.ressarcido&&nd(r.forma)&&(r.conta||"")===nome){ const val=Number(r.valor)||0; mov.push({data:r.data_ressarcimento||r.data,hist:"Reembolso",desc:r.pessoa||r.descricao||"",ident:"",ent:0,sai:val}); } });
+    transferencias.forEach(t=>{ const val=Number(t.valor)||0;
+      if((t.conta_de||"")===nome) mov.push({data:t.data,hist:"Transferência (saída)",desc:"Para "+(t.conta_para||"Caixa"),ident:t.identificador||"",ent:0,sai:val});
+      if((t.conta_para||"")===nome) mov.push({data:t.data,hist:"Transferência (entrada)",desc:"De "+(t.conta_de||"Caixa"),ident:t.identificador||"",ent:val,sai:0});
+    });
+    mov.sort((a,b)=>String(a.data||"9999-99-99").localeCompare(String(b.data||"9999-99-99")));
+    let saldo=0;
+    const rows=mov.map(m=>{ saldo+=m.ent-m.sai; return {Data:fmtData(m.data),"Histórico":m.hist,"Descrição":m.desc,Identificador:m.ident,Entrada:m.ent?Number(m.ent):"",Saída:m.sai?Number(m.sai):"",Saldo:Math.round(saldo*100)/100}; });
+    rows.push({Data:"","Histórico":"","Descrição":"",Identificador:"SALDO FINAL",Entrada:"",Saída:"",Saldo:Math.round(saldo*100)/100});
+    const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{Data:"","Histórico":"","Descrição":"",Identificador:"(sem movimentos)",Entrada:"",Saída:"",Saldo:0}]);
+    ws["!cols"]=[{wch:11},{wch:20},{wch:34},{wch:22},{wch:11},{wch:11},{wch:13}];
+    let sn=(nome||"Conta").replace(/[\[\]\:\*\?\/\\]/g,"").trim().slice(0,28)||"Conta";
+    let base=sn,i=2; while(usados[sn.toLowerCase()]){ sn=base.slice(0,26)+" "+(i++); } usados[sn.toLowerCase()]=1;
+    XLSX.utils.book_append_sheet(wb,ws,sn);
+  });
+  XLSX.writeFile(wb, "extrato-contas-"+hoje()+".xlsx");
 }
 function fmtData(iso){ if(!iso) return "—"; const [a,m,d]=iso.split("-"); return `${d}/${m}/${a.slice(2)}`; }
 function esc(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])) }
