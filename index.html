@@ -599,6 +599,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <div class="campo"><label for="tPara">Para</label><select id="tPara"></select></div>
         <div class="campo"><label for="tValor">Valor (R$)</label><input type="number" id="tValor" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
         <div class="campo"><label for="tData">Data</label><input type="date" id="tData" required></div>
+        <div class="campo"><label for="tIdent">Identificador (extrato)</label><input type="text" id="tIdent" placeholder="Ex.: ID/nome no extrato"></div>
         <div class="campo"><label for="tObs">Observação (opcional)</label><input type="text" id="tObs" placeholder="Ex.: depósito no banco"></div>
         <button type="submit" class="btn-add" id="btnAddTransf">+ Registrar transferência</button>
       </form>
@@ -918,7 +919,7 @@ function renderTransferencias(){
   $("#transfCorpo").innerHTML=lista.map(t=>{
     const deLbl=t.conta_de?("🏦 "+esc(t.conta_de)):(t.sentido==="conta_caixa"?"🏦 (conta?)":"💵 Caixa");
     const paraLbl=t.conta_para?("🏦 "+esc(t.conta_para)):(t.sentido==="caixa_conta"?"🏦 (conta?)":"💵 Caixa");
-    return `<tr><td>${fmtData(t.data)}</td><td>${deLbl} → ${paraLbl}${t.obs?` · <span style="color:#7a8896">${esc(t.obs)}</span>`:""}</td><td class="num">${brl(t.valor)}</td><td><button class="del" data-id="${t.id}" title="Excluir">🗑</button></td></tr>`;
+    return `<tr><td>${fmtData(t.data)}</td><td>${deLbl} → ${paraLbl}${t.identificador?` · 👤 <span style="color:#7a8896">${esc(t.identificador)}</span>`:""}${t.obs?` · <span style="color:#7a8896">${esc(t.obs)}</span>`:""}</td><td class="num">${brl(t.valor)}</td><td><button class="del" data-id="${t.id}" title="Excluir">🗑</button></td></tr>`;
   }).join("");
   $("#transfVazio").style.display=lista.length?"none":"block";
 }
@@ -931,7 +932,7 @@ async function addTransf(e){
   const conta_de=de==="__caixa"?null:de, conta_para=para==="__caixa"?null:para;
   const sentido = conta_de===null ? "caixa_conta" : (conta_para===null ? "conta_caixa" : "conta_conta");
   $("#btnAddTransf").disabled=true;
-  const {error}=await sb.from("transferencias").insert({valor:v,sentido,conta_de,conta_para,data:$("#tData").value,obs:$("#tObs").value.trim()});
+  const {error}=await sb.from("transferencias").insert({valor:v,sentido,conta_de,conta_para,identificador:$("#tIdent").value.trim(),data:$("#tData").value,obs:$("#tObs").value.trim()});
   $("#btnAddTransf").disabled=false;
   if(error){ alert("Erro ao salvar: "+error.message); return; }
   e.target.reset(); $("#tData").value=hoje(); fillContaSelects(); carregarTudo();
@@ -1446,7 +1447,7 @@ function exportarTudo(){
   add("Camisas", vendas.map(v=>({Data:v.data,Comprador:v.comprador,Tamanho:v.tamanho,Qtd:v.quantidade,"Valor unit.":Number(v.valor_unit),Total:Number(v.valor_total),Pago:Number(v.valor_pago),Falta:Math.max(0,Number(v.valor_total)-Number(v.valor_pago)),"Situação":situacao(v),Forma:v.forma,Entregue:v.entregue?"sim":"não","Entregue em":v.entregue_em,"Obs entrega":v.entrega_obs,"Responsável":v.responsavel,Pagamentos:(Array.isArray(v.pagamentos)?v.pagamentos:[]).map(p=>`${fmtData(p.data)} ${p.forma||""}${p.conta?" ["+p.conta+"]":""}${p.ident?" ("+p.ident+")":""} R$${Number(p.valor).toFixed(2)}`).join(" | ")})));
   const estMap={}; estoque.forEach(e=>{ const k=e.tamanho||"—"; estMap[k]=(estMap[k]||0)+Number(e.quantidade||0); });
   add("Estoque", Object.entries(estMap).map(([t,q])=>({Tamanho:t,Produzida:q,Vendida:vendidasPorTam(t),Entregue:entreguesPorTam(t),Estoque:q-entreguesPorTam(t),"Disponível":q-vendidasPorTam(t)})));
-  add("Transferências", transferencias.map(t=>({Data:t.data,De:t.conta_de||"Caixa",Para:t.conta_para||"Caixa",Valor:Number(t.valor),"Observação":t.obs})));
+  add("Transferências", transferencias.map(t=>({Data:t.data,De:t.conta_de||"Caixa",Para:t.conta_para||"Caixa",Valor:Number(t.valor),Identificador:t.identificador,"Observação":t.obs})));
   add("Reembolsos", reembolsos.map(r=>({Data:r.data,"Quem pagou":r.pessoa,"Descrição":r.descricao,Categoria:r.categoria,Valor:Number(r.valor),Status:r.ressarcido?"Ressarcido":"Pendente",Forma:r.forma,Conta:r.conta,"Ressarcido em":r.data_ressarcimento,Comprovante:r.comprovante_url})));
   XLSX.writeFile(wb, "triduo-completo-"+hoje()+".xlsx");
 }
