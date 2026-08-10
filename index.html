@@ -276,6 +276,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <div class="campo"><label for="forma">Forma de pagamento</label><select id="forma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
         <div class="campo"><label for="finConta">Conta (Pix/Cartão)</label><select id="finConta"></select></div>
         <div class="campo"><label for="data">Data</label><input type="date" id="data" required></div>
+        <div class="campo"><label for="finPagador">Identificador (nome no Pix / extrato)</label><input type="text" id="finPagador" placeholder="Ex.: nome no Pix"></div>
         <div class="campo"><label for="responsavel">Responsável</label><input type="text" id="responsavel" placeholder="Quem registrou"></div>
         <div class="campo full"><label for="detalhamento">Detalhamento (opcional)</label><textarea id="detalhamento" rows="2" placeholder="Observações, itens do gasto, contexto..." style="padding:10px;border:1px solid var(--borda);border-radius:8px;font-size:16px;font-family:inherit;resize:vertical;width:100%"></textarea></div>
         <div class="campo"><label for="finFile">Comprovante (opcional)</label><input type="file" id="finFile" accept="image/*,.pdf"></div>
@@ -323,6 +324,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <div class="campo"><label for="triValor">Valor (R$)</label><input type="number" id="triValor" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
         <div class="campo"><label for="triForma">Forma de pagamento</label><select id="triForma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
         <div class="campo"><label for="triConta">Conta (Pix/Cartão)</label><select id="triConta"></select></div>
+        <div class="campo"><label for="triPagador">Identificador (nome no Pix / extrato)</label><input type="text" id="triPagador" placeholder="Ex.: nome no Pix"></div>
         <div class="campo"><label for="triResp">Responsável</label><input type="text" id="triResp" placeholder="Quem registrou"></div>
         <div class="campo"><label for="triData">Data</label><input type="date" id="triData" required></div>
         <button type="submit" class="btn-add" id="btnAddTri">+ Adicionar lançamento</button>
@@ -369,6 +371,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <div class="campo"><label for="filValor">Valor total (R$)</label><input type="number" id="filValor" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
         <div class="campo"><label for="filForma">Forma de pagamento</label><select id="filForma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
         <div class="campo"><label for="filConta">Conta (Pix/Cartão)</label><select id="filConta"></select></div>
+        <div class="campo"><label for="filIdent">Identificador (nome no Pix / extrato)</label><input type="text" id="filIdent" placeholder="Ex.: nome no Pix"></div>
         <div class="campo"><label for="filData">Data</label><input type="date" id="filData" required></div>
         <div class="campo"><label for="filResp">Responsável</label><input type="text" id="filResp" placeholder="Quem registrou"></div>
         <div class="campo check full"><input type="checkbox" id="filPago"><label for="filPago" style="font-weight:600">Já pago</label></div>
@@ -437,6 +440,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <div class="campo"><label for="vPago">Valor pago agora (R$)</label><input type="number" id="vPago" step="0.01" min="0" placeholder="0,00" inputmode="decimal"></div>
         <div class="campo"><label for="vForma">Forma de pagamento</label><select id="vForma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
         <div class="campo"><label for="vConta">Conta (Pix/Cartão)</label><select id="vConta"></select></div>
+        <div class="campo"><label for="vIdent">Identificador (nome no Pix)</label><input type="text" id="vIdent" placeholder="Ex.: nome no Pix"></div>
         <div class="campo"><label for="vFile">Comprovante (opcional)</label><input type="file" id="vFile" accept="image/*,.pdf"></div>
         <div class="campo check"><input type="checkbox" id="vPagoInt"><label for="vPagoInt" style="font-weight:600">Pagou o valor total</label></div>
         <div class="campo check"><input type="checkbox" id="vEntregue"><label for="vEntregue" style="font-weight:600">Já entregue</label></div>
@@ -832,7 +836,7 @@ function editarFin(id){
   const d=fin.find(x=>x.id===id); if(!d) return;
   editFinId=id; setTipo(d.tipo);
   $("#desc").value=d.descricao||""; $("#valor").value=d.valor;
-  $("#forma").value=d.forma||""; $("#data").value=d.data||hoje(); $("#responsavel").value=d.responsavel||""; $("#detalhamento").value=d.detalhamento||"";
+  $("#forma").value=d.forma||""; $("#data").value=d.data||hoje(); $("#responsavel").value=d.responsavel||""; $("#finPagador").value=d.identificador||""; $("#detalhamento").value=d.detalhamento||"";
   $("#categoria").value=d.categoria||""; if($("#finConta"))$("#finConta").value=d.conta||"";
   if(d.categoria && $("#categoria").value!==d.categoria){ $("#categoria").insertAdjacentHTML("beforeend",`<option value="${esc(d.categoria)}">${esc(d.categoria)}</option>`); $("#categoria").value=d.categoria; }
   $("#finFile").value="";
@@ -849,7 +853,7 @@ async function addFin(e){
   let url=null;
   try{ if(temArquivo) url=await subirComprovante($("#finFile"),"financeiro"); }
   catch(err){ $("#btnAddFin").disabled=false; $("#btnAddFin").textContent=rotuloBtnFin(); return; }
-  const reg={tipo,descricao:$("#desc").value.trim(),valor:v,categoria:$("#categoria").value,forma:$("#forma").value,conta:ehDin($("#forma").value)?null:($("#finConta").value||null),data:$("#data").value,responsavel:$("#responsavel").value.trim(),detalhamento:$("#detalhamento").value.trim()};
+  const reg={tipo,descricao:$("#desc").value.trim(),valor:v,categoria:$("#categoria").value,forma:$("#forma").value,conta:ehDin($("#forma").value)?null:($("#finConta").value||null),data:$("#data").value,responsavel:$("#responsavel").value.trim(),identificador:$("#finPagador").value.trim(),detalhamento:$("#detalhamento").value.trim()};
   if(temArquivo) reg.comprovante_url=url;
   let error;
   if(editFinId){ ({error}=await sb.from("lancamentos").update(reg).eq("id",editFinId)); }
@@ -897,9 +901,9 @@ function renderFin(){
     if(fc&&(d.categoria||"")!==fc) return false;
     if(fDe&&(d.data||"")<fDe) return false;
     if(fAte&&(d.data||"")>fAte) return false;
-    if(q&&!((d.descricao||"")+" "+(d.categoria||"")+" "+(d.responsavel||"")+" "+(d.detalhamento||"")).toLowerCase().includes(q)) return false; return true; });
+    if(q&&!((d.descricao||"")+" "+(d.categoria||"")+" "+(d.responsavel||"")+" "+(d.detalhamento||"")+" "+(d.identificador||"")).toLowerCase().includes(q)) return false; return true; });
   $("#corpoFin").innerHTML=lista.map(d=>{ const s=d.tipo==="receita"?"+":"−", c=d.tipo==="receita"?"rec":"desp";
-    return `<tr><td>${fmtData(d.data)}</td><td><b>${esc(d.descricao)||"—"}</b> <span class="tag ${c}">${d.tipo==="receita"?"Rec.":"Desp."}</span>${d.detalhamento?`<div style="font-size:.8rem;color:#7a8896;white-space:normal;max-width:320px">${esc(d.detalhamento)}</div>`:""}</td><td>${esc(d.categoria)||"—"}</td><td>${formaTag(d.forma)||"—"}</td><td>${d.conta?"🏦 "+esc(d.conta):"—"}</td><td>${esc(d.responsavel)||"—"}</td><td class="valor ${c}">${s} ${brl(d.valor)}</td><td>${anexo(d.comprovante_url)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${d.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${d.id}" title="Excluir">🗑</button></td></tr>`; }).join("");
+    return `<tr><td>${fmtData(d.data)}</td><td><b>${esc(d.descricao)||"—"}</b> <span class="tag ${c}">${d.tipo==="receita"?"Rec.":"Desp."}</span>${d.identificador?`<div style="font-size:.78rem;color:#7a8896">👤 ${esc(d.identificador)}</div>`:""}${d.detalhamento?`<div style="font-size:.8rem;color:#7a8896;white-space:normal;max-width:320px">${esc(d.detalhamento)}</div>`:""}</td><td>${esc(d.categoria)||"—"}</td><td>${formaTag(d.forma)||"—"}</td><td>${d.conta?"🏦 "+esc(d.conta):"—"}</td><td>${esc(d.responsavel)||"—"}</td><td class="valor ${c}">${s} ${brl(d.valor)}</td><td>${anexo(d.comprovante_url)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${d.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${d.id}" title="Excluir">🗑</button></td></tr>`; }).join("");
   $("#vazioFin").style.display=lista.length?"none":"block"; $("#vazioFin").textContent="Nenhum lançamento ainda.";
   const sf=lista.reduce((s,d)=>s+(d.tipo==="receita"?Number(d.valor):-Number(d.valor)),0);
   $("#footFin").textContent=brl(sf);
@@ -976,7 +980,7 @@ async function addVenda(e){
   let pago=$("#vPagoInt").checked?total:(parseFloat($("#vPago").value)||0); if(pago>total) pago=total;
   $("#btnAddVenda").disabled=true; $("#btnAddVenda").textContent="Salvando…";
   let url=null; try{ url=await subirComprovante($("#vFile"),"camisas"); }catch(err){ $("#btnAddVenda").disabled=false; $("#btnAddVenda").textContent="+ Registrar venda"; return; }
-  const pagamentos = pago>0 ? [{data:$("#vData").value||hoje(), valor:pago, forma:$("#vForma").value||null, conta:ehDin($("#vForma").value)?null:($("#vConta").value||null)}] : [];
+  const pagamentos = pago>0 ? [{data:$("#vData").value||hoje(), valor:pago, forma:$("#vForma").value||null, conta:ehDin($("#vForma").value)?null:($("#vConta").value||null), ident:$("#vIdent").value.trim()||null}] : [];
   const {error}=await sb.from("camisas_vendas").insert({comprador:$("#vComprador").value.trim(),tamanho:$("#vTam").value.trim(),quantidade:qtd,valor_unit:unit,valor_total:total,valor_pago:pago,pagamentos,forma:$("#vForma").value,entregue:$("#vEntregue").checked,comprovante_url:url,responsavel:$("#vResp").value.trim(),data:$("#vData").value});
   $("#btnAddVenda").disabled=false; $("#btnAddVenda").textContent="+ Registrar venda";
   if(error){ alert("Erro ao salvar: "+error.message); return; }
@@ -1043,8 +1047,9 @@ function abrirGerenciar(id){
   const histHtml=pagtos.length?(pagtos.map(p=>`<div class="pgto-lin" style="flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-start">
         <input type="date" class="pg-data" value="${p.data||""}" style="min-width:120px;flex:0 0 auto">
         <select class="pg-forma" style="min-width:84px;flex:0 0 auto">${optsForma(p.forma)}</select>
-        <select class="pg-conta" style="min-width:90px;flex:0 0 auto">${optsConta(p.conta)}</select>
-        <input type="number" step="0.01" min="0" class="pg-valor" value="${Number(p.valor)}" style="width:78px;flex:0 0 auto">
+        <select class="pg-conta" style="min-width:86px;flex:0 0 auto">${optsConta(p.conta)}</select>
+        <input type="text" class="pg-ident" value="${esc(p.ident||"")}" placeholder="identif." style="min-width:86px;flex:0 0 auto">
+        <input type="number" step="0.01" min="0" class="pg-valor" value="${Number(p.valor)}" style="width:74px;flex:0 0 auto">
         <button class="del" data-rmrow="1" title="Remover" style="font-size:1rem">×</button>
       </div>`).join("")+`<button class="btn-sec" id="mSalvarPg" style="margin-top:10px;width:100%">💾 Salvar pagamentos</button>`):`<div style="color:#9aa7b2;font-size:.85rem">Nenhum pagamento registrado ainda.</div>`;
   $("#modalBox").innerHTML=`
@@ -1067,6 +1072,7 @@ function abrirGerenciar(id){
           <div class="campo"><label>Valor (R$)</label><input type="number" id="mValor" step="0.01" min="0" placeholder="${falta.toFixed(2)}" inputmode="decimal"></div>
           <div class="campo"><label>Forma</label><select id="mForma"><option value="">—</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
           <div class="campo"><label>Conta</label><select id="mConta">${optsConta("")}</select></div>
+          <div class="campo"><label>Identificador</label><input type="text" id="mIdent" placeholder="nome no Pix"></div>
           <div class="campo"><label>Data</label><input type="date" id="mData" value="${hoje()}"></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px">
@@ -1107,8 +1113,8 @@ function abrirGerenciar(id){
     </div>`;
   $("#modalBg").classList.remove("hide");
   $("#mFechar").onclick=fecharModal;
-  const bAdd=$("#mAddPg"); if(bAdd) bAdd.onclick=async()=>{ const val=parseFloat($("#mValor").value); if(isNaN(val)||val<=0){ alert("Informe um valor."); return; } await registrarPagamento(v,val,$("#mForma").value,$("#mData").value,$("#mConta")?$("#mConta").value:""); };
-  const mq=$("#mQuitar"); if(mq) mq.onclick=async()=>{ await registrarPagamento(v,falta,$("#mForma").value,$("#mData").value,$("#mConta")?$("#mConta").value:""); };
+  const bAdd=$("#mAddPg"); if(bAdd) bAdd.onclick=async()=>{ const val=parseFloat($("#mValor").value); if(isNaN(val)||val<=0){ alert("Informe um valor."); return; } await registrarPagamento(v,val,$("#mForma").value,$("#mData").value,$("#mConta")?$("#mConta").value:"",$("#mIdent")?$("#mIdent").value.trim():""); };
+  const mq=$("#mQuitar"); if(mq) mq.onclick=async()=>{ await registrarPagamento(v,falta,$("#mForma").value,$("#mData").value,$("#mConta")?$("#mConta").value:"",$("#mIdent")?$("#mIdent").value.trim():""); };
   $("#modalBox").querySelectorAll("[data-rmrow]").forEach(b=>b.onclick=()=>b.closest(".pgto-lin").remove());
   const bsp=$("#mSalvarPg"); if(bsp) bsp.onclick=()=>salvarPagamentos(v);
   const be=$("#mEntregar"); if(be) be.onclick=async()=>{ await salvarEntrega(id,true,$("#mObs").value.trim(),$("#mEntData").value); };
@@ -1130,11 +1136,11 @@ async function editarVenda(id){
   if(error){ alert("Erro: "+error.message); return; }
   fecharModal(); await carregarTudo();
 }
-async function registrarPagamento(v,valor,forma,data,conta){
+async function registrarPagamento(v,valor,forma,data,conta,ident){
   const total=Number(v.valor_total);
   const novoPago=Math.min(total,Number(v.valor_pago)+valor);
   const reg=Math.round((novoPago-Number(v.valor_pago))*100)/100;
-  const pagtos=(Array.isArray(v.pagamentos)?v.pagamentos:[]).concat([{data:data||hoje(),valor:reg,forma:forma||null,conta:ehDin(forma)?null:(conta||null)}]);
+  const pagtos=(Array.isArray(v.pagamentos)?v.pagamentos:[]).concat([{data:data||hoje(),valor:reg,forma:forma||null,conta:ehDin(forma)?null:(conta||null),ident:ident||null}]);
   const upd={valor_pago:novoPago,pagamentos:pagtos};
   if(forma&&!v.forma) upd.forma=forma;
   const {error}=await sb.from("camisas_vendas").update(upd).eq("id",v.id);
@@ -1145,8 +1151,9 @@ async function salvarPagamentos(v){
   const datas=[...$("#modalBox").querySelectorAll(".pg-data")];
   const formas=[...$("#modalBox").querySelectorAll(".pg-forma")];
   const contasSel=[...$("#modalBox").querySelectorAll(".pg-conta")];
+  const identsSel=[...$("#modalBox").querySelectorAll(".pg-ident")];
   const valores=[...$("#modalBox").querySelectorAll(".pg-valor")];
-  const pagtos=datas.map((d,i)=>{ const forma=(formas[i]&&formas[i].value)||null; return { data:d.value||null, forma, conta:ehDin(forma)?null:((contasSel[i]&&contasSel[i].value)||null), valor:Math.round((parseFloat(valores[i].value)||0)*100)/100 }; }).filter(p=>p.valor>0);
+  const pagtos=datas.map((d,i)=>{ const forma=(formas[i]&&formas[i].value)||null; return { data:d.value||null, forma, conta:ehDin(forma)?null:((contasSel[i]&&contasSel[i].value)||null), ident:(identsSel[i]&&identsSel[i].value.trim())||null, valor:Math.round((parseFloat(valores[i].value)||0)*100)/100 }; }).filter(p=>p.valor>0);
   const total=Number(v.valor_total);
   let novoPago=Math.round(pagtos.reduce((s,p)=>s+p.valor,0)*100)/100; if(novoPago>total) novoPago=total;
   const {error}=await sb.from("camisas_vendas").update({valor_pago:novoPago,pagamentos:pagtos}).eq("id",v.id);
@@ -1189,8 +1196,8 @@ function renderTriduo(){
   const foot='<tr style="font-weight:700;background:#f7f9fb"><td>Total</td>'+NOITES.map(n=>`<td class="num">${brl(totNoite(n))}</td>`).join("")+`<td class="num">${brl(total)}</td></tr>`;
   $("#triMatrizWrap").innerHTML=`<table><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table>`;
   const q=$("#triBusca").value.toLowerCase(), fn=$("#triFiltroNoite").value, fg=$("#triFiltroGrupo").value, ff=$("#triFiltroForma")?$("#triFiltroForma").value:"", fc=$("#triFiltroConta")?$("#triFiltroConta").value:"";
-  const lista=triduo.filter(t=>{ if(fn&&t.noite!==fn)return false; if(fg&&t.grupo!==fg)return false; if(ff&&(t.forma||"")!==ff)return false; if(fc==="__sem"&&t.conta)return false; if(fc&&fc!=="__sem"&&(t.conta||"")!==fc)return false; if(q&&!((t.descricao||"")+" "+(t.responsavel||"")+" "+(t.grupo||"")+" "+(t.noite||"")+" "+(t.conta||"")).toLowerCase().includes(q))return false; return true; });
-  $("#triCorpo").innerHTML=lista.map(t=>`<tr><td>${fmtData(t.data)}</td><td>${esc(t.noite)}</td><td>${esc(t.grupo)}</td><td>${esc(t.descricao)||"—"}</td><td>${formaTag(t.forma)||"—"}</td><td>${t.conta?"🏦 "+esc(t.conta):"—"}</td><td>${esc(t.responsavel)||"—"}</td><td class="valor rec">${brl(t.valor)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${t.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${t.id}" title="Excluir">🗑</button></td></tr>`).join("");
+  const lista=triduo.filter(t=>{ if(fn&&t.noite!==fn)return false; if(fg&&t.grupo!==fg)return false; if(ff&&(t.forma||"")!==ff)return false; if(fc==="__sem"&&t.conta)return false; if(fc&&fc!=="__sem"&&(t.conta||"")!==fc)return false; if(q&&!((t.descricao||"")+" "+(t.responsavel||"")+" "+(t.grupo||"")+" "+(t.noite||"")+" "+(t.conta||"")+" "+(t.identificador||"")).toLowerCase().includes(q))return false; return true; });
+  $("#triCorpo").innerHTML=lista.map(t=>`<tr><td>${fmtData(t.data)}</td><td>${esc(t.noite)}</td><td>${esc(t.grupo)}</td><td>${esc(t.descricao)||"—"}${t.identificador?`<div style="font-size:.78rem;color:#7a8896">👤 ${esc(t.identificador)}</div>`:""}</td><td>${formaTag(t.forma)||"—"}</td><td>${t.conta?"🏦 "+esc(t.conta):"—"}</td><td>${esc(t.responsavel)||"—"}</td><td class="valor rec">${brl(t.valor)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${t.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${t.id}" title="Excluir">🗑</button></td></tr>`).join("");
   $("#triVazio").style.display=lista.length?"none":"block";
   $("#triFoot").textContent=brl(lista.reduce((s,t)=>s+Number(t.valor||0),0));
 }
@@ -1199,7 +1206,7 @@ async function addTri(e){
   const v=parseFloat($("#triValor").value);
   if(!$("#triNoite").value||!$("#triGrupo").value){ alert("Escolha a noite e o grupo."); return; }
   if(isNaN(v)||v<=0){ alert("Informe um valor válido."); return; }
-  const reg={noite:$("#triNoite").value,grupo:$("#triGrupo").value,descricao:$("#triDesc").value.trim(),valor:v,forma:$("#triForma").value,conta:ehDin($("#triForma").value)?null:($("#triConta").value||null),responsavel:$("#triResp").value.trim(),data:$("#triData").value};
+  const reg={noite:$("#triNoite").value,grupo:$("#triGrupo").value,descricao:$("#triDesc").value.trim(),valor:v,forma:$("#triForma").value,conta:ehDin($("#triForma").value)?null:($("#triConta").value||null),identificador:$("#triPagador").value.trim(),responsavel:$("#triResp").value.trim(),data:$("#triData").value};
   $("#btnAddTri").disabled=true;
   let error;
   if(editTriId){ ({error}=await sb.from("triduo_lancamentos").update(reg).eq("id",editTriId)); }
@@ -1210,7 +1217,7 @@ async function addTri(e){
 }
 function cancelarEdicaoTri(){ editTriId=null; $("#btnCancelTri").classList.add("hide"); $("#formTri").reset(); $("#triData").value=hoje(); $("#btnAddTri").textContent="+ Adicionar lançamento"; fillTriSelects(); }
 function editarTri(id){ const t=triduo.find(x=>x.id===id); if(!t)return; editTriId=id; fillTriSelects();
-  $("#triNoite").value=t.noite; $("#triGrupo").value=t.grupo; $("#triDesc").value=t.descricao||""; $("#triValor").value=t.valor; $("#triForma").value=t.forma||""; if($("#triConta"))$("#triConta").value=t.conta||""; $("#triResp").value=t.responsavel||""; $("#triData").value=t.data||hoje();
+  $("#triNoite").value=t.noite; $("#triGrupo").value=t.grupo; $("#triDesc").value=t.descricao||""; $("#triValor").value=t.valor; $("#triForma").value=t.forma||""; if($("#triConta"))$("#triConta").value=t.conta||""; if($("#triPagador"))$("#triPagador").value=t.identificador||""; $("#triResp").value=t.responsavel||""; $("#triData").value=t.data||hoje();
   $("#painelTri").classList.remove("hide"); $("#btnAddTri").textContent="Salvar alterações"; $("#btnCancelTri").classList.remove("hide"); $("#painelTri").scrollIntoView({behavior:"smooth",block:"center"}); }
 
 /* ---------- FILIPETAS ---------- */
@@ -1236,7 +1243,7 @@ function renderFilipetas(){
     if(fst==="confirmado"&&!f.confirmado) return false;
     if(ff&&(f.forma||"")!==ff) return false;
     if(fcta==="__sem"&&f.conta) return false; if(fcta&&fcta!=="__sem"&&(f.conta||"")!==fcta) return false;
-    if(q&&!((f.nome||"")+" "+(f.noite||"")+" "+(f.responsavel||"")+" "+(f.obs||"")).toLowerCase().includes(q)) return false;
+    if(q&&!((f.nome||"")+" "+(f.noite||"")+" "+(f.responsavel||"")+" "+(f.obs||"")+" "+(f.identificador||"")).toLowerCase().includes(q)) return false;
     return true;
   });
   $("#filCorpo").innerHTML=lista.map(f=>{
@@ -1245,7 +1252,7 @@ function renderFilipetas(){
       : (f.confirmado
           ? `<span class="tag pago" data-desconfirmar="${f.id}" title="Desfazer confirmação">✓ Confirmado</span>`
           : `<span class="tag parc" data-baixa="${f.id}" title="Desmarcar pago">Pago</span> <button class="btn-sec" style="padding:3px 8px;font-size:.72rem" data-confirmar="${f.id}">✓ Confirmar</button>`);
-    return `<tr><td>${fmtData(f.data)}</td><td><b>${esc(f.nome)||"—"}</b>${f.obs?`<div style="font-size:.78rem;color:#7a8896">${esc(f.obs)}</div>`:""}</td><td>${esc(f.noite)||"—"}</td><td class="num">${f.quantidade||1}</td><td class="num">${brl(f.valor)}</td><td>${formaTag(f.forma)||"—"}</td><td>${f.conta?"🏦 "+esc(f.conta):"—"}</td><td>${st}</td><td>${fmtData(f.data_pagamento)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${f.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${f.id}" title="Excluir">🗑</button></td></tr>`;
+    return `<tr><td>${fmtData(f.data)}</td><td><b>${esc(f.nome)||"—"}</b>${f.identificador?`<div style="font-size:.78rem;color:#7a8896">👤 ${esc(f.identificador)}</div>`:""}${f.obs?`<div style="font-size:.78rem;color:#7a8896">${esc(f.obs)}</div>`:""}</td><td>${esc(f.noite)||"—"}</td><td class="num">${f.quantidade||1}</td><td class="num">${brl(f.valor)}</td><td>${formaTag(f.forma)||"—"}</td><td>${f.conta?"🏦 "+esc(f.conta):"—"}</td><td>${st}</td><td>${fmtData(f.data_pagamento)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${f.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${f.id}" title="Excluir">🗑</button></td></tr>`;
   }).join("");
   $("#filVazio").style.display=lista.length?"none":"block";
   $("#filFootQtd").textContent=lista.reduce((s,f)=>s+Number(f.quantidade||1),0);
@@ -1256,7 +1263,7 @@ async function addFil(e){
   const v=parseFloat($("#filValor").value);
   if(isNaN(v)||v<=0){ alert("Informe um valor válido."); return; }
   const pago=$("#filPago").checked;
-  const reg={nome:$("#filNome").value.trim(),noite:$("#filNoite").value,quantidade:Math.max(1,parseInt($("#filQtdInput").value)||1),valor:v,forma:$("#filForma").value,conta:ehDin($("#filForma").value)?null:($("#filConta").value||null),data:$("#filData").value,responsavel:$("#filResp").value.trim(),obs:$("#filObs").value.trim(),pago,data_pagamento:pago?$("#filData").value:null};
+  const reg={nome:$("#filNome").value.trim(),noite:$("#filNoite").value,quantidade:Math.max(1,parseInt($("#filQtdInput").value)||1),valor:v,forma:$("#filForma").value,conta:ehDin($("#filForma").value)?null:($("#filConta").value||null),identificador:$("#filIdent").value.trim(),data:$("#filData").value,responsavel:$("#filResp").value.trim(),obs:$("#filObs").value.trim(),pago,data_pagamento:pago?$("#filData").value:null};
   $("#btnAddFil").disabled=true;
   let error;
   if(editFilId){ ({error}=await sb.from("filipetas").update(reg).eq("id",editFilId)); }
@@ -1267,7 +1274,7 @@ async function addFil(e){
 }
 function cancelarEdicaoFil(){ editFilId=null; $("#btnCancelFil").classList.add("hide"); $("#formFil").reset(); $("#filData").value=hoje(); $("#btnAddFil").textContent="+ Adicionar filipeta"; fillFilSelects(); }
 function editarFil(id){ const f=filipetas.find(x=>x.id===id); if(!f)return; editFilId=id; fillFilSelects();
-  $("#filNome").value=f.nome||""; $("#filNoite").value=f.noite||""; $("#filQtdInput").value=f.quantidade||1; $("#filValor").value=f.valor; $("#filForma").value=f.forma||""; if($("#filConta"))$("#filConta").value=f.conta||""; $("#filData").value=f.data||hoje(); $("#filResp").value=f.responsavel||""; $("#filObs").value=f.obs||""; $("#filPago").checked=!!f.pago;
+  $("#filNome").value=f.nome||""; $("#filNoite").value=f.noite||""; $("#filQtdInput").value=f.quantidade||1; $("#filValor").value=f.valor; $("#filForma").value=f.forma||""; if($("#filConta"))$("#filConta").value=f.conta||""; if($("#filIdent"))$("#filIdent").value=f.identificador||""; $("#filData").value=f.data||hoje(); $("#filResp").value=f.responsavel||""; $("#filObs").value=f.obs||""; $("#filPago").checked=!!f.pago;
   $("#painelFil").classList.remove("hide"); $("#btnAddFil").textContent="Salvar alterações"; $("#btnCancelFil").classList.remove("hide"); $("#painelFil").scrollIntoView({behavior:"smooth",block:"center"}); }
 function folhaLeilaoPDF(){
   let rows=""; for(let i=0;i<26;i++){ rows+=`<tr><td style="height:26px"></td><td></td><td></td><td></td><td></td></tr>`; }
@@ -1430,10 +1437,10 @@ function exportarTudo(){
   if(typeof XLSX==="undefined"){ alert("Biblioteca de Excel não carregou. Verifique a internet e recarregue."); return; }
   const wb=XLSX.utils.book_new();
   const add=(nome,arr)=>{ const ws=XLSX.utils.json_to_sheet(arr.length?arr:[{}]); XLSX.utils.book_append_sheet(wb,ws,nome); };
-  add("Financeiro", fin.map(d=>({Data:d.data,Tipo:d.tipo,"Descrição":d.descricao,Detalhamento:d.detalhamento,Categoria:d.categoria,Forma:d.forma,Conta:d.conta,"Responsável":d.responsavel,Valor:Number(d.valor),Comprovante:d.comprovante_url})));
-  add("Tríduo", triduo.map(t=>({Data:t.data,Noite:t.noite,Grupo:t.grupo,"Descrição":t.descricao,Forma:t.forma,Conta:t.conta,"Responsável":t.responsavel,Valor:Number(t.valor)})));
-  add("Filipetas", filipetas.map(f=>({Data:f.data,Nome:f.nome,Noite:f.noite,Qtd:Number(f.quantidade||1),Valor:Number(f.valor),Forma:f.forma,Conta:f.conta,Status:f.pago?(f.confirmado?"Confirmado":"Pago"):"Pendente","Pago em":f.data_pagamento,"Responsável":f.responsavel,"Observação":f.obs})));
-  add("Camisas", vendas.map(v=>({Data:v.data,Comprador:v.comprador,Tamanho:v.tamanho,Qtd:v.quantidade,"Valor unit.":Number(v.valor_unit),Total:Number(v.valor_total),Pago:Number(v.valor_pago),Falta:Math.max(0,Number(v.valor_total)-Number(v.valor_pago)),"Situação":situacao(v),Forma:v.forma,Entregue:v.entregue?"sim":"não","Entregue em":v.entregue_em,"Obs entrega":v.entrega_obs,"Responsável":v.responsavel,Pagamentos:(Array.isArray(v.pagamentos)?v.pagamentos:[]).map(p=>`${fmtData(p.data)} ${p.forma||""} R$${Number(p.valor).toFixed(2)}`).join(" | ")})));
+  add("Financeiro", fin.map(d=>({Data:d.data,Tipo:d.tipo,"Descrição":d.descricao,Identificador:d.identificador,Detalhamento:d.detalhamento,Categoria:d.categoria,Forma:d.forma,Conta:d.conta,"Responsável":d.responsavel,Valor:Number(d.valor),Comprovante:d.comprovante_url})));
+  add("Tríduo", triduo.map(t=>({Data:t.data,Noite:t.noite,Grupo:t.grupo,"Descrição":t.descricao,Identificador:t.identificador,Forma:t.forma,Conta:t.conta,"Responsável":t.responsavel,Valor:Number(t.valor)})));
+  add("Filipetas", filipetas.map(f=>({Data:f.data,Nome:f.nome,Noite:f.noite,Qtd:Number(f.quantidade||1),Valor:Number(f.valor),Forma:f.forma,Conta:f.conta,Identificador:f.identificador,Status:f.pago?(f.confirmado?"Confirmado":"Pago"):"Pendente","Pago em":f.data_pagamento,"Responsável":f.responsavel,"Observação":f.obs})));
+  add("Camisas", vendas.map(v=>({Data:v.data,Comprador:v.comprador,Tamanho:v.tamanho,Qtd:v.quantidade,"Valor unit.":Number(v.valor_unit),Total:Number(v.valor_total),Pago:Number(v.valor_pago),Falta:Math.max(0,Number(v.valor_total)-Number(v.valor_pago)),"Situação":situacao(v),Forma:v.forma,Entregue:v.entregue?"sim":"não","Entregue em":v.entregue_em,"Obs entrega":v.entrega_obs,"Responsável":v.responsavel,Pagamentos:(Array.isArray(v.pagamentos)?v.pagamentos:[]).map(p=>`${fmtData(p.data)} ${p.forma||""}${p.conta?" ["+p.conta+"]":""}${p.ident?" ("+p.ident+")":""} R$${Number(p.valor).toFixed(2)}`).join(" | ")})));
   const estMap={}; estoque.forEach(e=>{ const k=e.tamanho||"—"; estMap[k]=(estMap[k]||0)+Number(e.quantidade||0); });
   add("Estoque", Object.entries(estMap).map(([t,q])=>({Tamanho:t,Produzida:q,Vendida:vendidasPorTam(t),Entregue:entreguesPorTam(t),Estoque:q-entreguesPorTam(t),"Disponível":q-vendidasPorTam(t)})));
   add("Transferências", transferencias.map(t=>({Data:t.data,De:t.conta_de||"Caixa",Para:t.conta_para||"Caixa",Valor:Number(t.valor),"Observação":t.obs})));
