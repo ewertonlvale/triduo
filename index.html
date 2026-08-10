@@ -455,13 +455,14 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <select id="filtroPag"><option value="">Status: todos</option><option value="pago">Pago</option><option value="parc">Parcial</option><option value="pend">Pendente</option></select>
       <select id="filtroEnt"><option value="">Entrega: todas</option><option value="sim">Entregue</option><option value="nao">Não entregue</option></select>
       <select id="filtroForma"><option value="">Forma: todas</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select>
+      <select id="filtroContaCam"><option value="">Conta: todas</option></select>
       <div style="display:flex;flex-direction:column;gap:2px;font-size:.68rem;color:#7a8896"><span>Pago em</span><input type="date" id="filtroPagoEm" style="min-width:135px"></div>
       <div style="display:flex;flex-direction:column;gap:2px;font-size:.68rem;color:#7a8896"><span>Entregue em</span><input type="date" id="filtroEntregueEm" style="min-width:135px"></div>
       <button class="btn-sec" id="btnLimparV" title="Limpar filtros">✕ Limpar</button>
     </div>
     <div class="lista">
       <table>
-        <thead><tr><th>Venda</th><th>Comprador</th><th>Tam.</th><th class="num">Qtd</th><th class="num">Total</th><th>Forma</th><th>Pgto</th><th>Pago em</th><th>Entrega</th><th>Entregue em</th><th></th><th></th><th></th></tr></thead>
+        <thead><tr><th>Venda</th><th>Comprador</th><th>Tam.</th><th class="num">Qtd</th><th class="num">Total</th><th>Forma</th><th>Conta</th><th>Pgto</th><th>Pago em</th><th>Entrega</th><th>Entregue em</th><th></th><th></th><th></th></tr></thead>
         <tbody id="corpoVenda"></tbody>
       </table>
       <div class="vazio" id="vazioVenda">Nenhuma venda registrada ainda.</div>
@@ -712,8 +713,8 @@ function ligarEventos(){
   $("#formEst").onsubmit=addEstoque; $("#formVenda").onsubmit=addVenda;
   $("#buscaV").oninput=renderVendas; $("#filtroPag").onchange=renderVendas;
   $("#filtroTam").onchange=renderVendas; $("#filtroEnt").onchange=renderVendas; $("#filtroForma").onchange=renderVendas;
-  $("#filtroPagoEm").onchange=renderVendas; $("#filtroEntregueEm").onchange=renderVendas;
-  $("#btnLimparV").onclick=()=>{ ["#buscaV","#filtroTam","#filtroPag","#filtroEnt","#filtroForma","#filtroPagoEm","#filtroEntregueEm"].forEach(s=>{ if($(s))$(s).value=""; }); renderVendas(); };
+  $("#filtroPagoEm").onchange=renderVendas; $("#filtroEntregueEm").onchange=renderVendas; $("#filtroContaCam").onchange=renderVendas;
+  $("#btnLimparV").onclick=()=>{ ["#buscaV","#filtroTam","#filtroPag","#filtroEnt","#filtroForma","#filtroContaCam","#filtroPagoEm","#filtroEntregueEm"].forEach(s=>{ if($(s))$(s).value=""; }); renderVendas(); };
   fillTamSelects();
   $("#corpoEst").onclick=e=>{ if(e.target.classList.contains("del")&&confirm("Remover esta entrada de estoque?")) delFrom("camisas_estoque",e.target.dataset.id); };
   $("#corpoVenda").onclick=onVendaClick;
@@ -798,7 +799,7 @@ function fillContaSelects(){
   const dp='<option value="__caixa">💵 Caixa</option>'+contas.map(c=>`<option value="${esc(c.nome)}">${esc(c.nome)}</option>`).join("");
   ["#tDe","#tPara"].forEach(sel=>{ const el=$(sel); if(el){ const a=el.value; el.innerHTML=dp; el.value=(a&&(a==="__caixa"||contas.some(c=>c.nome===a)))?a:"__caixa"; } });
   const fopts='<option value="">Conta: todas</option>'+contas.map(c=>`<option value="${esc(c.nome)}">${esc(c.nome)}</option>`).join("")+'<option value="__sem">(sem conta)</option>';
-  ["#triFiltroConta","#filtroContaFin","#filFiltroConta"].forEach(sel=>{ const el=$(sel); if(el){ const a=el.value; el.innerHTML=fopts; el.value=a; } });
+  ["#triFiltroConta","#filtroContaFin","#filFiltroConta","#filtroContaCam"].forEach(sel=>{ const el=$(sel); if(el){ const a=el.value; el.innerHTML=fopts; el.value=a; } });
 }
 function renderContas(){
   if(!$("#contaChips")) return;
@@ -880,6 +881,7 @@ function saldoCaixaDinheiro(){
 }
 function formaTag(f){ if(!f) return ""; const cls=f==="Pix"?"pix":f==="Dinheiro"?"dinheiro":f==="Cartão"?"cartao":""; return `<span class="forma ${cls}">${esc(f)}</span>`; }
 function formaCelula(v){ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; const fs=[...new Set(pg.map(p=>p.forma).filter(Boolean))]; if(fs.length>1) return `<span class="forma" title="${fs.join(', ')}">Vários</span>`; return formaTag(fs[0]||v.forma)||"—"; }
+function contaCelula(v){ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; const cs=[...new Set(pg.map(p=>p.conta).filter(Boolean))]; if(cs.length>1) return `<span class="forma" title="${cs.join(', ')}">🏦 Vários</span>`; return cs[0]?("🏦 "+esc(cs[0])):"—"; }
 function anexo(url){ return url?`<a class="anexo" href="${url}" target="_blank" title="Ver comprovante">📎</a>`:""; }
 function renderFin(){
   const recM=fin.filter(d=>d.tipo==="receita").reduce((s,d)=>s+Number(d.valor),0);
@@ -1012,22 +1014,23 @@ function situacao(v){ const t=Number(v.valor_total),p=Number(v.valor_pago); if(p
 function renderVendas(){
   const q=$("#buscaV").value.toLowerCase(), f=$("#filtroPag").value;
   const fTam=$("#filtroTam")?$("#filtroTam").value:"", fEnt=$("#filtroEnt")?$("#filtroEnt").value:"", fForma=$("#filtroForma")?$("#filtroForma").value:"";
-  const fPago=$("#filtroPagoEm")?$("#filtroPagoEm").value:"", fEntreg=$("#filtroEntregueEm")?$("#filtroEntregueEm").value:"";
+  const fPago=$("#filtroPagoEm")?$("#filtroPagoEm").value:"", fEntreg=$("#filtroEntregueEm")?$("#filtroEntregueEm").value:"", fCta=$("#filtroContaCam")?$("#filtroContaCam").value:"";
   const lista=vendas.filter(v=>{ const st=situacao(v);
     if(f&&st!==f) return false;
     if(fTam&&(v.tamanho||"")!==fTam) return false;
     if(fEnt==="sim"&&!v.entregue) return false; if(fEnt==="nao"&&v.entregue) return false;
     if(fForma&&(v.forma||"")!==fForma) return false;
+    if(fCta){ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; if(fCta==="__sem"){ if(!pg.some(p=>!ehDin(p.forma)&&!p.conta)) return false; } else if(!pg.some(p=>(p.conta||"")===fCta)) return false; }
     if(fPago){ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; if(!pg.some(p=>p.data===fPago)) return false; }
     if(fEntreg&&(v.entregue_em||"")!==fEntreg) return false;
-    if(q){ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; const hay=((v.comprador||"")+" "+(v.tamanho||"")+" "+(v.responsavel||"")+" "+(v.forma||"")+" "+fmtData(v.data)+" "+fmtData(v.entregue_em)+" "+pg.map(p=>fmtData(p.data)+" "+(p.forma||"")).join(" ")).toLowerCase(); if(!hay.includes(q)) return false; }
+    if(q){ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; const hay=((v.comprador||"")+" "+(v.tamanho||"")+" "+(v.responsavel||"")+" "+(v.forma||"")+" "+fmtData(v.data)+" "+fmtData(v.entregue_em)+" "+pg.map(p=>fmtData(p.data)+" "+(p.forma||"")+" "+(p.conta||"")+" "+(p.ident||"")).join(" ")).toLowerCase(); if(!hay.includes(q)) return false; }
     return true; });
   $("#corpoVenda").innerHTML=lista.map(v=>{ const st=situacao(v);
     const pagoTag=st==="pago"?`<span class="tag pago" data-act="ger" data-id="${v.id}">Pago</span>`:st==="parc"?`<span class="tag parc" data-act="ger" data-id="${v.id}">Falta ${brl(v.valor_total-v.valor_pago)}</span>`:`<span class="tag pend" data-act="ger" data-id="${v.id}">Pendente</span>`;
     const nota=v.entrega_obs?` <span title="${esc(v.entrega_obs)}">📝</span>`:"";
     const entTag=v.entregue?`<span class="tag entr" data-act="ger" data-id="${v.id}">Entregue</span>${nota}`:`<span class="tag nentr" data-act="ger" data-id="${v.id}">Não</span>`;
     const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; const datas=pg.map(p=>p.data).filter(Boolean).sort(); const pagoEm=datas.length?datas[datas.length-1]:null;
-    return `<tr><td>${fmtData(v.data)}</td><td><b>${esc(v.comprador)||"—"}</b></td><td>${esc(v.tamanho)}</td><td class="num">${v.quantidade}</td><td class="num">${brl(v.valor_total)}</td><td>${formaCelula(v)}</td><td>${pagoTag}</td><td>${fmtData(pagoEm)}</td><td>${entTag}</td><td>${fmtData(v.entregue_em)}</td><td><button class="btn-sec" style="padding:5px 9px" data-act="ger" data-id="${v.id}">⚙ Gerenciar</button></td><td>${anexo(v.comprovante_url)}</td><td><button class="del" data-id="${v.id}">🗑</button></td></tr>`; }).join("");
+    return `<tr><td>${fmtData(v.data)}</td><td><b>${esc(v.comprador)||"—"}</b></td><td>${esc(v.tamanho)}</td><td class="num">${v.quantidade}</td><td class="num">${brl(v.valor_total)}</td><td>${formaCelula(v)}</td><td>${contaCelula(v)}</td><td>${pagoTag}</td><td>${fmtData(pagoEm)}</td><td>${entTag}</td><td>${fmtData(v.entregue_em)}</td><td><button class="btn-sec" style="padding:5px 9px" data-act="ger" data-id="${v.id}">⚙ Gerenciar</button></td><td>${anexo(v.comprovante_url)}</td><td><button class="del" data-id="${v.id}">🗑</button></td></tr>`; }).join("");
   $("#vazioVenda").style.display=lista.length?"none":"block";
 }
 function onVendaClick(e){
