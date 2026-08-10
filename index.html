@@ -602,10 +602,11 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <div class="campo"><label for="tIdent">Identificador (extrato)</label><input type="text" id="tIdent" placeholder="Ex.: ID/nome no extrato"></div>
         <div class="campo"><label for="tObs">Observação (opcional)</label><input type="text" id="tObs" placeholder="Ex.: depósito no banco"></div>
         <button type="submit" class="btn-add" id="btnAddTransf">+ Registrar transferência</button>
+        <button type="button" class="btn-add hide" id="btnCancelTransf" style="background:#7a8896">Cancelar edição</button>
       </form>
       <div class="lista" style="margin-top:12px;margin-bottom:0">
         <table>
-          <thead><tr><th>Data</th><th>Movimento</th><th class="num">Valor</th><th></th></tr></thead>
+          <thead><tr><th>Data</th><th>Movimento</th><th class="num">Valor</th><th></th><th></th></tr></thead>
           <tbody id="transfCorpo"></tbody>
         </table>
         <div class="vazio" id="transfVazio">Nenhuma transferência registrada.</div>
@@ -641,7 +642,7 @@ const GRUPOS_TRIDUO = (Array.isArray(_CFG.GRUPOS_TRIDUO) && _CFG.GRUPOS_TRIDUO.l
 const LS="triduo_supabase_cfg";
 let sb=null, tipo="receita";
 let categorias=[], fin=[], estoque=[], vendas=[], triduo=[], transferencias=[], reembolsos=[], filipetas=[], contas=[];
-let editFinId=null, editTriId=null, editFilId=null;
+let editFinId=null, editTriId=null, editFilId=null, editTransfId=null;
 let _appIniciado=false, _inscrito=false, _carregando=false, _recarregar=false;
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const brl=n=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
@@ -687,7 +688,8 @@ function ligarEventos(){
   $("#btnReload").onclick=carregarTudo; $("#formFin").onsubmit=addFin;
   $("#btnExportTudo").onclick=exportarTudo;
   $("#formTransf").onsubmit=addTransf;
-  $("#transfCorpo").onclick=e=>{ if(e.target.classList.contains("del")&&confirm("Excluir esta transferência?")) delFrom("transferencias",e.target.dataset.id); };
+  $("#transfCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir esta transferência?")) delFrom("transferencias",t.dataset.id); } else if(t.dataset.edit){ editarTransf(t.dataset.edit); } };
+  $("#btnCancelTransf").onclick=cancelarEdicaoTransf;
   $("#reembLink").onclick=e=>{ e.preventDefault(); document.querySelector('#tabs button[data-tab="cfg"]').click(); };
   $("#formReemb").onsubmit=addReemb;
   $("#formFil").onsubmit=addFil;
@@ -919,7 +921,7 @@ function renderTransferencias(){
   $("#transfCorpo").innerHTML=lista.map(t=>{
     const deLbl=t.conta_de?("🏦 "+esc(t.conta_de)):(t.sentido==="conta_caixa"?"🏦 (conta?)":"💵 Caixa");
     const paraLbl=t.conta_para?("🏦 "+esc(t.conta_para)):(t.sentido==="caixa_conta"?"🏦 (conta?)":"💵 Caixa");
-    return `<tr><td>${fmtData(t.data)}</td><td>${deLbl} → ${paraLbl}${t.identificador?` · 👤 <span style="color:#7a8896">${esc(t.identificador)}</span>`:""}${t.obs?` · <span style="color:#7a8896">${esc(t.obs)}</span>`:""}</td><td class="num">${brl(t.valor)}</td><td><button class="del" data-id="${t.id}" title="Excluir">🗑</button></td></tr>`;
+    return `<tr><td>${fmtData(t.data)}</td><td>${deLbl} → ${paraLbl}${t.identificador?` · 👤 <span style="color:#7a8896">${esc(t.identificador)}</span>`:""}${t.obs?` · <span style="color:#7a8896">${esc(t.obs)}</span>`:""}</td><td class="num">${brl(t.valor)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${t.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${t.id}" title="Excluir">🗑</button></td></tr>`;
   }).join("");
   $("#transfVazio").style.display=lista.length?"none":"block";
 }
@@ -931,12 +933,19 @@ async function addTransf(e){
   if(de===para){ alert("Origem e destino devem ser diferentes."); return; }
   const conta_de=de==="__caixa"?null:de, conta_para=para==="__caixa"?null:para;
   const sentido = conta_de===null ? "caixa_conta" : (conta_para===null ? "conta_caixa" : "conta_conta");
+  const reg={valor:v,sentido,conta_de,conta_para,identificador:$("#tIdent").value.trim(),data:$("#tData").value,obs:$("#tObs").value.trim()};
   $("#btnAddTransf").disabled=true;
-  const {error}=await sb.from("transferencias").insert({valor:v,sentido,conta_de,conta_para,identificador:$("#tIdent").value.trim(),data:$("#tData").value,obs:$("#tObs").value.trim()});
+  let error;
+  if(editTransfId){ ({error}=await sb.from("transferencias").update(reg).eq("id",editTransfId)); }
+  else { ({error}=await sb.from("transferencias").insert(reg)); }
   $("#btnAddTransf").disabled=false;
   if(error){ alert("Erro ao salvar: "+error.message); return; }
-  e.target.reset(); $("#tData").value=hoje(); fillContaSelects(); carregarTudo();
+  cancelarEdicaoTransf(); carregarTudo();
 }
+function cancelarEdicaoTransf(){ editTransfId=null; if($("#btnCancelTransf"))$("#btnCancelTransf").classList.add("hide"); $("#formTransf").reset(); $("#tData").value=hoje(); fillContaSelects(); $("#btnAddTransf").textContent="+ Registrar transferência"; }
+function editarTransf(id){ const t=transferencias.find(x=>x.id===id); if(!t)return; editTransfId=id; fillContaSelects();
+  $("#tDe").value=t.conta_de||"__caixa"; $("#tPara").value=t.conta_para||"__caixa"; $("#tValor").value=t.valor; $("#tIdent").value=t.identificador||""; $("#tData").value=t.data||hoje(); $("#tObs").value=t.obs||"";
+  $("#btnAddTransf").textContent="Salvar alterações"; $("#btnCancelTransf").classList.remove("hide"); $("#formTransf").scrollIntoView({behavior:"smooth",block:"center"}); }
 
 /* ---------- REEMBOLSOS (gastos do bolso, a ressarcir) ---------- */
 function despesaReembolsos(){ return reembolsos.filter(r=>r.ressarcido).reduce((s,r)=>s+Number(r.valor||0),0); }
