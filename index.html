@@ -514,6 +514,20 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       </div>
 
       <div class="rel-sec">
+        <h3>Extrato da conta</h3>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+          <select id="relExtratoConta" style="padding:9px 12px;border:1px solid #cfd8e0;border-radius:8px;min-width:200px"></select>
+          <span id="relExtratoSaldo" style="font-size:.85rem;color:#556270"></span>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="rel">
+            <thead><tr><th>Data</th><th>Histórico</th><th>Descrição</th><th class="n">Entrada</th><th class="n">Saída</th><th class="n">Saldo</th></tr></thead>
+            <tbody id="relExtratoBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="rel-sec">
         <h3>Camisas</h3>
         <div class="rel-grid" style="margin-bottom:12px">
           <div class="rel-box"><div class="r">Arrecadado</div><div class="v" style="color:var(--verde)" id="relCamArrec">R$ 0,00</div></div>
@@ -694,6 +708,7 @@ function ligarEventos(){
   $("#btnReload").onclick=carregarTudo; $("#formFin").onsubmit=addFin;
   $("#btnExportTudo").onclick=exportarTudo;
   $("#btnExportExtratos").onclick=exportarExtratos;
+  if($("#relExtratoConta")) $("#relExtratoConta").onchange=renderExtratoConta;
   $("#formTransf").onsubmit=addTransf;
   $("#transfCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir esta transferência?")) delFrom("transferencias",t.dataset.id); } else if(t.dataset.edit){ editarTransf(t.dataset.edit); } };
   $("#btnCancelTransf").onclick=cancelarEdicaoTransf;
@@ -1356,6 +1371,7 @@ function renderRelatorio(){
     rowsC+=`<tr><td style="font-weight:700">Saldo total</td><td class="n" style="font-weight:700">${brl(rec-desp)}</td></tr>`;
     $("#relPorConta").innerHTML=rowsC;
   }
+  renderExtratoConta();
 
   // por categoria
   const porCat=tp=>{ const m={}; fin.filter(d=>d.tipo===tp).forEach(d=>{ const k=d.categoria||"(sem categoria)"; m[k]=(m[k]||0)+Number(d.valor); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
@@ -1467,24 +1483,52 @@ function exportarTudo(){
   add("Reembolsos", reembolsos.map(r=>({ID:r.id,Data:r.data,"Quem pagou":r.pessoa,"Descrição":r.descricao,Categoria:r.categoria,Valor:Number(r.valor),Status:r.ressarcido?"Ressarcido":"Pendente",Forma:r.forma,Conta:r.conta,"Ressarcido em":r.data_ressarcimento,Comprovante:r.comprovante_url})));
   XLSX.writeFile(wb, "triduo-completo-"+hoje()+".xlsx");
 }
+function movimentosDaConta(nome){
+  const nd=f=>!ehDin(f), mov=[];
+  fin.forEach(d=>{ if(nd(d.forma)&&(d.conta||"")===nome){ const val=Number(d.valor)||0; const rec=d.tipo==="receita"; mov.push({data:d.data,hist:rec?"Receita":"Despesa",desc:d.descricao||"",ident:d.identificador||"",ent:rec?val:0,sai:rec?0:val}); } });
+  triduo.forEach(t=>{ if(nd(t.forma)&&(t.conta||"")===nome){ const val=Number(t.valor)||0; mov.push({data:t.data,hist:"Tríduo "+(t.grupo||""),desc:[t.noite,t.descricao].filter(Boolean).join(" · "),ident:t.identificador||"",ent:val,sai:0}); } });
+  filipetas.forEach(f=>{ if(f.pago&&nd(f.forma)&&(f.conta||"")===nome){ const val=Number(f.valor)||0; mov.push({data:f.data_pagamento||f.data,hist:"Filipeta",desc:[f.nome,f.noite].filter(Boolean).join(" · "),ident:f.identificador||"",ent:val,sai:0}); } });
+  vendas.forEach(v=>{ (Array.isArray(v.pagamentos)?v.pagamentos:[]).forEach(p=>{ if(nd(p.forma)&&(p.conta||"")===nome){ const val=Number(p.valor)||0; mov.push({data:p.data,hist:"Camisa",desc:[v.comprador,v.tamanho].filter(Boolean).join(" · "),ident:p.ident||"",ent:val,sai:0}); } }); });
+  reembolsos.forEach(r=>{ if(r.ressarcido&&nd(r.forma)&&(r.conta||"")===nome){ const val=Number(r.valor)||0; mov.push({data:r.data_ressarcimento||r.data,hist:"Reembolso",desc:r.pessoa||r.descricao||"",ident:"",ent:0,sai:val}); } });
+  transferencias.forEach(t=>{ const val=Number(t.valor)||0;
+    if((t.conta_de||"")===nome) mov.push({data:t.data,hist:"Transferência (saída)",desc:"Para "+(t.conta_para||"Caixa"),ident:t.identificador||"",ent:0,sai:val});
+    if((t.conta_para||"")===nome) mov.push({data:t.data,hist:"Transferência (entrada)",desc:"De "+(t.conta_de||"Caixa"),ident:t.identificador||"",ent:val,sai:0});
+  });
+  mov.sort((a,b)=>String(a.data||"9999-99-99").localeCompare(String(b.data||"9999-99-99")));
+  let saldo=0; mov.forEach(m=>{ saldo+=m.ent-m.sai; m.saldo=Math.round(saldo*100)/100; });
+  return mov;
+}
+function renderExtratoConta(){
+  const sel=$("#relExtratoConta"); if(!sel) return;
+  const nomes=contas.map(c=>c.nome);
+  if(sel.dataset.n!==String(nomes.length)){
+    const atual=sel.value;
+    sel.innerHTML=nomes.length?nomes.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join(""):'<option value="">— nenhuma conta —</option>';
+    if(nomes.includes(atual)) sel.value=atual;
+    sel.dataset.n=String(nomes.length);
+  }
+  const nome=sel.value; const body=$("#relExtratoBody"), info=$("#relExtratoSaldo");
+  if(!nome){ body.innerHTML='<tr><td colspan="6" style="text-align:center;color:#9aa7b2;padding:14px">Cadastre uma conta em Config para ver o extrato.</td></tr>'; info.textContent=""; return; }
+  const mov=movimentosDaConta(nome);
+  if(!mov.length){ body.innerHTML='<tr><td colspan="6" style="text-align:center;color:#9aa7b2;padding:14px">Sem movimentos nesta conta.</td></tr>'; info.textContent="Saldo: "+brl(0); return; }
+  body.innerHTML=mov.map(m=>`<tr>
+    <td style="white-space:nowrap">${fmtData(m.data)}</td>
+    <td>${esc(m.hist)}</td>
+    <td>${esc(m.desc)}${m.ident?` <small style="color:#7a8896">(${esc(m.ident)})</small>`:""}</td>
+    <td class="n" style="color:var(--verde-esc)">${m.ent?brl(m.ent):""}</td>
+    <td class="n" style="color:var(--vermelho)">${m.sai?brl(m.sai):""}</td>
+    <td class="n" style="font-weight:600">${brl(m.saldo)}</td></tr>`).join("");
+  const fim=mov[mov.length-1].saldo, ent=mov.reduce((s,m)=>s+m.ent,0), sai=mov.reduce((s,m)=>s+m.sai,0);
+  info.innerHTML=`${mov.length} movimentos · Entradas <b style="color:var(--verde-esc)">${brl(ent)}</b> · Saídas <b style="color:var(--vermelho)">${brl(sai)}</b> · Saldo <b style="color:var(--azul)">${brl(fim)}</b>`;
+}
 function exportarExtratos(){
   if(typeof XLSX==="undefined"){ alert("Biblioteca de Excel não carregou. Verifique a internet e recarregue."); return; }
   if(!contas.length){ alert("Nenhuma conta bancária cadastrada. Cadastre uma conta em Config → Contas bancárias."); return; }
-  const wb=XLSX.utils.book_new(); const nd=f=>!ehDin(f); const usados={};
+  const wb=XLSX.utils.book_new(); const usados={};
   contas.forEach(c=>{
-    const nome=c.nome, mov=[];
-    fin.forEach(d=>{ if(nd(d.forma)&&(d.conta||"")===nome){ const val=Number(d.valor)||0; const rec=d.tipo==="receita"; mov.push({data:d.data,hist:rec?"Receita":"Despesa",desc:d.descricao||"",ident:d.identificador||"",ent:rec?val:0,sai:rec?0:val}); } });
-    triduo.forEach(t=>{ if(nd(t.forma)&&(t.conta||"")===nome){ const val=Number(t.valor)||0; mov.push({data:t.data,hist:"Tríduo "+(t.grupo||""),desc:[t.noite,t.descricao].filter(Boolean).join(" · "),ident:t.identificador||"",ent:val,sai:0}); } });
-    filipetas.forEach(f=>{ if(f.pago&&nd(f.forma)&&(f.conta||"")===nome){ const val=Number(f.valor)||0; mov.push({data:f.data_pagamento||f.data,hist:"Filipeta",desc:[f.nome,f.noite].filter(Boolean).join(" · "),ident:f.identificador||"",ent:val,sai:0}); } });
-    vendas.forEach(v=>{ (Array.isArray(v.pagamentos)?v.pagamentos:[]).forEach(p=>{ if(nd(p.forma)&&(p.conta||"")===nome){ const val=Number(p.valor)||0; mov.push({data:p.data,hist:"Camisa",desc:[v.comprador,v.tamanho].filter(Boolean).join(" · "),ident:p.ident||"",ent:val,sai:0}); } }); });
-    reembolsos.forEach(r=>{ if(r.ressarcido&&nd(r.forma)&&(r.conta||"")===nome){ const val=Number(r.valor)||0; mov.push({data:r.data_ressarcimento||r.data,hist:"Reembolso",desc:r.pessoa||r.descricao||"",ident:"",ent:0,sai:val}); } });
-    transferencias.forEach(t=>{ const val=Number(t.valor)||0;
-      if((t.conta_de||"")===nome) mov.push({data:t.data,hist:"Transferência (saída)",desc:"Para "+(t.conta_para||"Caixa"),ident:t.identificador||"",ent:0,sai:val});
-      if((t.conta_para||"")===nome) mov.push({data:t.data,hist:"Transferência (entrada)",desc:"De "+(t.conta_de||"Caixa"),ident:t.identificador||"",ent:val,sai:0});
-    });
-    mov.sort((a,b)=>String(a.data||"9999-99-99").localeCompare(String(b.data||"9999-99-99")));
-    let saldo=0;
-    const rows=mov.map(m=>{ saldo+=m.ent-m.sai; return {Data:fmtData(m.data),"Histórico":m.hist,"Descrição":m.desc,Identificador:m.ident,Entrada:m.ent?Number(m.ent):"",Saída:m.sai?Number(m.sai):"",Saldo:Math.round(saldo*100)/100}; });
+    const nome=c.nome, mov=movimentosDaConta(nome);
+    const rows=mov.map(m=>({Data:fmtData(m.data),"Histórico":m.hist,"Descrição":m.desc,Identificador:m.ident,Entrada:m.ent?Number(m.ent):"",Saída:m.sai?Number(m.sai):"",Saldo:m.saldo}));
+    let saldo=mov.length?mov[mov.length-1].saldo:0;
     rows.push({Data:"","Histórico":"","Descrição":"",Identificador:"SALDO FINAL",Entrada:"",Saída:"",Saldo:Math.round(saldo*100)/100});
     const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{Data:"","Histórico":"","Descrição":"",Identificador:"(sem movimentos)",Entrada:"",Saída:"",Saldo:0}]);
     ws["!cols"]=[{wch:11},{wch:20},{wch:34},{wch:22},{wch:11},{wch:11},{wch:13}];
