@@ -599,6 +599,8 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <div class="campo"><label for="rValor">Valor (R$)</label><input type="number" id="rValor" step="0.01" min="0" placeholder="0,00" inputmode="decimal" required></div>
         <div class="campo"><label for="rCat">Categoria</label><input type="text" id="rCat" list="cats" placeholder="Ex.: Cozinha"></div>
         <div class="campo"><label for="rData">Data do gasto</label><input type="date" id="rData" required></div>
+        <div class="campo"><label for="rForma">Forma de pagamento</label><select id="rForma"><option value="">— definir ao ressarcir —</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
+        <div class="campo"><label for="rConta">Conta (Pix/Cartão)</label><select id="rConta"><option value="">— conta —</option></select></div>
         <div class="campo full"><label for="rFile">Comprovante (opcional)</label><input type="file" id="rFile" accept="image/*,.pdf"></div>
         <button type="submit" class="btn-add" id="btnAddReemb" style="background:var(--laranja)">+ Registrar reembolso pendente</button>
         <button type="button" class="btn-add hide" id="btnCancelReemb" style="background:#7a8896">Cancelar edição</button>
@@ -823,7 +825,7 @@ function ehDin(f){ return (f||"").trim().toLowerCase()==="dinheiro"; }
 function optsConta(sel){ return '<option value="">— conta —</option>'+contas.map(c=>`<option value="${esc(c.nome)}"${c.nome===sel?" selected":""}>${esc(c.nome)}</option>`).join(""); }
 function fillContaSelects(){
   const opts='<option value="">— conta —</option>'+contas.map(c=>`<option value="${esc(c.nome)}">${esc(c.nome)}</option>`).join("");
-  ["#finConta","#triConta","#filConta","#mConta","#vConta"].forEach(sel=>{ const el=$(sel); if(el){ const a=el.value; el.innerHTML=opts; if(contas.some(c=>c.nome===a))el.value=a; } });
+  ["#finConta","#triConta","#filConta","#mConta","#vConta","#rConta"].forEach(sel=>{ const el=$(sel); if(el){ const a=el.value; el.innerHTML=opts; if(contas.some(c=>c.nome===a))el.value=a; } });
   const dp='<option value="__caixa">💵 Caixa</option>'+contas.map(c=>`<option value="${esc(c.nome)}">${esc(c.nome)}</option>`).join("");
   ["#tDe","#tPara"].forEach(sel=>{ const el=$(sel); if(el){ const a=el.value; el.innerHTML=dp; el.value=(a&&(a==="__caixa"||contas.some(c=>c.nome===a)))?a:"__caixa"; } });
   const fopts='<option value="">Conta: todas</option>'+contas.map(c=>`<option value="${esc(c.nome)}">${esc(c.nome)}</option>`).join("")+'<option value="__sem">(sem conta)</option>';
@@ -998,6 +1000,7 @@ function editarReemb(id){
   editReembId=id;
   $("#rDesc").value=r.descricao||""; $("#rPessoa").value=r.pessoa||"";
   $("#rValor").value=r.valor; $("#rCat").value=r.categoria||""; $("#rData").value=r.data||hoje();
+  $("#rForma").value=r.forma||""; if($("#rConta")) $("#rConta").value=r.conta||"";
   $("#rFile").value="";
   $("#btnAddReemb").textContent="Salvar alterações"; $("#btnCancelReemb").classList.remove("hide");
   $("#formReemb").scrollIntoView({behavior:"smooth",block:"center"});
@@ -1009,7 +1012,8 @@ async function addReemb(e){
   const temArquivo=$("#rFile").files&&$("#rFile").files[0];
   $("#btnAddReemb").disabled=true;
   let url=null; try{ if(temArquivo) url=await subirComprovante($("#rFile"),"reembolsos"); }catch(err){ $("#btnAddReemb").disabled=false; return; }
-  const reg={descricao:$("#rDesc").value.trim(),pessoa:$("#rPessoa").value.trim(),valor:v,categoria:$("#rCat").value.trim(),data:$("#rData").value};
+  const forma=$("#rForma").value;
+  const reg={descricao:$("#rDesc").value.trim(),pessoa:$("#rPessoa").value.trim(),valor:v,categoria:$("#rCat").value.trim(),data:$("#rData").value,forma:forma||null,conta:(forma&&!ehDin(forma))?($("#rConta").value||null):null};
   if(temArquivo) reg.comprovante_url=url;
   let error;
   if(editReembId){ ({error}=await sb.from("reembolsos").update(reg).eq("id",editReembId)); }
