@@ -601,6 +601,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <div class="campo"><label for="rData">Data do gasto</label><input type="date" id="rData" required></div>
         <div class="campo full"><label for="rFile">Comprovante (opcional)</label><input type="file" id="rFile" accept="image/*,.pdf"></div>
         <button type="submit" class="btn-add" id="btnAddReemb" style="background:var(--laranja)">+ Registrar reembolso pendente</button>
+        <button type="button" class="btn-add hide" id="btnCancelReemb" style="background:#7a8896">Cancelar edição</button>
       </form>
       <div class="lista" style="margin-top:12px;margin-bottom:0">
         <table>
@@ -662,7 +663,7 @@ const GRUPOS_TRIDUO = (Array.isArray(_CFG.GRUPOS_TRIDUO) && _CFG.GRUPOS_TRIDUO.l
 const LS="triduo_supabase_cfg";
 let sb=null, tipo="receita";
 let categorias=[], fin=[], estoque=[], vendas=[], triduo=[], transferencias=[], reembolsos=[], filipetas=[], contas=[];
-let editFinId=null, editTriId=null, editFilId=null, editTransfId=null;
+let editFinId=null, editTriId=null, editFilId=null, editTransfId=null, editReembId=null;
 let _appIniciado=false, _inscrito=false, _carregando=false, _recarregar=false;
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const brl=n=>Number(n||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
@@ -721,11 +722,13 @@ function ligarEventos(){
   $("#btnLimparFil").onclick=()=>{ ["#filBusca","#filFiltroNoite","#filFiltroStatus","#filFiltroForma","#filFiltroConta"].forEach(s=>{ if($(s))$(s).value=""; }); renderFilipetas(); };
   $("#btnFilPdf").onclick=relatorioFilipetasPDF;
   $("#filCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],[data-baixa],[data-confirmar],[data-desconfirmar],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir esta filipeta?")) delFrom("filipetas",t.dataset.id); } else if(t.dataset.confirmar){ confirmarFil(t.dataset.confirmar,true); } else if(t.dataset.desconfirmar){ confirmarFil(t.dataset.desconfirmar,false); } else if(t.dataset.baixa){ baixaFil(t.dataset.baixa); } else if(t.dataset.edit){ editarFil(t.dataset.edit); } };
-  $("#reembCorpo").onclick=e=>{ const t=e.target;
+  $("#reembCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],[data-rss],[data-desfazer],.del"); if(!t) return;
     if(t.classList.contains("del")){ if(confirm("Excluir este reembolso?")) delFrom("reembolsos",t.dataset.id); return; }
+    if(t.dataset.edit){ editarReemb(t.dataset.edit); return; }
     if(t.dataset.rss){ const fs=$("#reembCorpo").querySelector('.rss-forma[data-id="'+t.dataset.rss+'"]'); const cs=$("#reembCorpo").querySelector('.rss-conta[data-id="'+t.dataset.rss+'"]'); ressarcir(t.dataset.rss, fs?fs.value:"Dinheiro", cs?cs.value:""); return; }
     if(t.dataset.desfazer){ desfazerReemb(t.dataset.desfazer); return; }
   };
+  $("#btnCancelReemb").onclick=cancelarEdicaoReemb;
   $("#btnNovoFin").onclick=()=>$("#painelFin").classList.toggle("hide");
   $("#btnNovaVenda").onclick=()=>$("#painelVenda").classList.toggle("hide");
   $("#btnEstoque").onclick=()=>$("#painelEstoque").classList.toggle("hide");
@@ -981,20 +984,39 @@ function renderReembolsos(){
   $("#reembCorpo").innerHTML=lista.map(r=>{
     const acao=r.ressarcido?`<span class="tag pago">Ressarcido</span> ${r.forma?formaTag(r.forma):""} ${r.data_ressarcimento?`<span style="color:#7a8896;font-size:.75rem">${fmtData(r.data_ressarcimento)}</span>`:""}`:`<span class="tag pend">Pendente</span>`;
     const botoes=r.ressarcido?`<button class="btn-sec" style="padding:4px 8px" data-desfazer="${r.id}">Desfazer</button>`:`<select class="rss-forma" data-id="${r.id}" style="padding:5px;font-size:.78rem">${fopts(r.forma)}</select> <select class="rss-conta" data-id="${r.id}" style="padding:5px;font-size:.78rem">${optsConta("")}</select> <button class="btn-sec" style="padding:4px 8px;background:var(--verde);color:#fff;border:none" data-rss="${r.id}">✓ Ressarcir</button>`;
-    return `<tr><td>${fmtData(r.data)}</td><td>${esc(r.pessoa)||"—"}</td><td><b>${esc(r.descricao)||"—"}</b>${r.categoria?` <span style="color:#7a8896;font-size:.78rem">${esc(r.categoria)}</span>`:""} ${anexo(r.comprovante_url)}</td><td class="num">${brl(r.valor)}</td><td>${acao}</td><td>${botoes}</td><td><button class="del" data-id="${r.id}" title="Excluir">🗑</button></td></tr>`;
+    return `<tr><td>${fmtData(r.data)}</td><td>${esc(r.pessoa)||"—"}</td><td><b>${esc(r.descricao)||"—"}</b>${r.categoria?` <span style="color:#7a8896;font-size:.78rem">${esc(r.categoria)}</span>`:""} ${anexo(r.comprovante_url)}</td><td class="num">${brl(r.valor)}</td><td>${acao}</td><td>${botoes}</td><td style="white-space:nowrap"><button class="btn-sec" style="padding:4px 8px" data-edit="${r.id}" title="Editar">✏️</button> <button class="del" data-id="${r.id}" title="Excluir">🗑</button></td></tr>`;
   }).join("");
   $("#reembVazio").style.display=lista.length?"none":"block";
+}
+function cancelarEdicaoReemb(){
+  editReembId=null; $("#btnCancelReemb").classList.add("hide");
+  $("#formReemb").reset(); $("#rData").value=hoje();
+  $("#btnAddReemb").textContent="+ Registrar reembolso pendente";
+}
+function editarReemb(id){
+  const r=reembolsos.find(x=>x.id===id); if(!r) return;
+  editReembId=id;
+  $("#rDesc").value=r.descricao||""; $("#rPessoa").value=r.pessoa||"";
+  $("#rValor").value=r.valor; $("#rCat").value=r.categoria||""; $("#rData").value=r.data||hoje();
+  $("#rFile").value="";
+  $("#btnAddReemb").textContent="Salvar alterações"; $("#btnCancelReemb").classList.remove("hide");
+  $("#formReemb").scrollIntoView({behavior:"smooth",block:"center"});
 }
 async function addReemb(e){
   e.preventDefault();
   const v=parseFloat($("#rValor").value);
   if(isNaN(v)||v<=0){ alert("Informe um valor válido."); return; }
+  const temArquivo=$("#rFile").files&&$("#rFile").files[0];
   $("#btnAddReemb").disabled=true;
-  let url=null; try{ url=await subirComprovante($("#rFile"),"reembolsos"); }catch(err){ $("#btnAddReemb").disabled=false; return; }
-  const {error}=await sb.from("reembolsos").insert({descricao:$("#rDesc").value.trim(),pessoa:$("#rPessoa").value.trim(),valor:v,categoria:$("#rCat").value.trim(),data:$("#rData").value,comprovante_url:url,ressarcido:false});
+  let url=null; try{ if(temArquivo) url=await subirComprovante($("#rFile"),"reembolsos"); }catch(err){ $("#btnAddReemb").disabled=false; return; }
+  const reg={descricao:$("#rDesc").value.trim(),pessoa:$("#rPessoa").value.trim(),valor:v,categoria:$("#rCat").value.trim(),data:$("#rData").value};
+  if(temArquivo) reg.comprovante_url=url;
+  let error;
+  if(editReembId){ ({error}=await sb.from("reembolsos").update(reg).eq("id",editReembId)); }
+  else { reg.comprovante_url=url; reg.ressarcido=false; ({error}=await sb.from("reembolsos").insert(reg)); }
   $("#btnAddReemb").disabled=false;
   if(error){ alert("Erro ao salvar: "+error.message); return; }
-  e.target.reset(); $("#rData").value=hoje(); carregarTudo();
+  cancelarEdicaoReemb(); carregarTudo();
 }
 async function ressarcir(id,forma,conta){ const {error}=await sb.from("reembolsos").update({ressarcido:true,forma:forma||null,conta:ehDin(forma)?null:(conta||null),data_ressarcimento:hoje()}).eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
 async function desfazerReemb(id){ const {error}=await sb.from("reembolsos").update({ressarcido:false,data_ressarcimento:null}).eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
