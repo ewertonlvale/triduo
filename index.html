@@ -585,6 +585,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <form id="formConta" style="grid-template-columns:1fr auto">
         <div class="campo"><label for="contaNome">Nova conta</label><input type="text" id="contaNome" placeholder="Ex.: Conta Thalles" required></div>
         <div class="campo"><label>&nbsp;</label><button type="submit" class="btn-sec" style="background:var(--azul);color:#fff;border:none;padding:11px 16px">Adicionar</button></div>
+        <div class="campo full" style="margin-top:2px"><label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer"><input type="checkbox" id="contaContab" checked style="width:auto"> Contabilizar os lançamentos desta conta no <b>resumo geral</b> (desmarque para uma conta paralela, fora do total)</label></div>
       </form>
       <div id="contaChips" style="margin-top:12px"></div>
     </div>
@@ -737,7 +738,7 @@ function ligarEventos(){
   $("#formCat").onsubmit=addCategoria;
   $("#catChips").onclick=e=>{ if(e.target.dataset.del&&confirm("Remover esta categoria?")) delFrom("categorias",e.target.dataset.del); };
   $("#formConta").onsubmit=addConta;
-  $("#contaChips").onclick=e=>{ if(e.target.dataset.del&&confirm("Remover esta conta?")) delFrom("contas",e.target.dataset.del); };
+  $("#contaChips").onclick=e=>{ const t=e.target; if(t.dataset.del){ if(confirm("Remover esta conta?")) delFrom("contas",t.dataset.del); } else if(t.dataset.toggle){ toggleContaContab(t.dataset.toggle); } };
   $("#corpoFin").onclick=e=>{ const t=e.target.closest("[data-edit],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir este lançamento?")) delFrom("lancamentos",t.dataset.id); } else if(t.dataset.edit){ editarFin(t.dataset.edit); } };
   $("#btnCancelFin").onclick=cancelarEdicaoFin;
   $("#formEst").onsubmit=addEstoque; $("#formVenda").onsubmit=addVenda;
@@ -833,14 +834,18 @@ function fillContaSelects(){
 }
 function renderContas(){
   if(!$("#contaChips")) return;
-  $("#contaChips").innerHTML=contas.length?contas.map(c=>`<span class="chip">🏦 ${esc(c.nome)} <button data-del="${c.id}" title="Remover">×</button></span>`).join(""):'<span style="color:#9aa7b2;font-size:.85rem">Nenhuma conta cadastrada.</span>';
+  $("#contaChips").innerHTML=contas.length?contas.map(c=>{ const fora=c.contabiliza===false;
+    const badge=fora?`<button data-toggle="${c.id}" title="Está fora do resumo geral — clique para incluir" style="border:none;background:#ffe3e3;color:#c92a2a;border-radius:10px;padding:1px 7px;font-size:.72rem;cursor:pointer">🚫 fora do total</button>`:`<button data-toggle="${c.id}" title="Entra no resumo geral — clique para deixar fora" style="border:none;background:#d3f9d8;color:#2b8a3e;border-radius:10px;padding:1px 7px;font-size:.72rem;cursor:pointer">✓ no total</button>`;
+    return `<span class="chip"${fora?' style="opacity:.7"':''}>🏦 ${esc(c.nome)} ${badge} <button data-del="${c.id}" title="Remover">×</button></span>`; }).join(""):'<span style="color:#9aa7b2;font-size:.85rem">Nenhuma conta cadastrada.</span>';
 }
 async function addConta(e){
   e.preventDefault(); const nome=$("#contaNome").value.trim(); if(!nome) return;
   if(contas.some(c=>c.nome.toLowerCase()===nome.toLowerCase())){ alert("Essa conta já existe."); return; }
-  const {error}=await sb.from("contas").insert({nome}); if(error){ alert("Erro: "+error.message); return; }
-  e.target.reset(); carregarTudo();
+  const contabiliza=$("#contaContab")?$("#contaContab").checked:true;
+  const {error}=await sb.from("contas").insert({nome,contabiliza}); if(error){ alert("Erro: "+error.message); return; }
+  e.target.reset(); if($("#contaContab")) $("#contaContab").checked=true; carregarTudo();
 }
+async function toggleContaContab(id){ const c=contas.find(x=>x.id===id); if(!c) return; const {error}=await sb.from("contas").update({contabiliza:c.contabiliza===false}).eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
 function contaSaldo(nome){
   let s=0;
   fin.forEach(d=>{ if(!ehDin(d.forma) && (d.conta||"")===nome) s+= d.tipo==="receita"?Number(d.valor):-Number(d.valor); });
@@ -893,7 +898,12 @@ async function addFin(e){
   if(error){ $("#btnAddFin").textContent=rotuloBtnFin(); alert("Erro ao salvar: "+error.message); return; }
   cancelarEdicaoFin(); carregarTudo();
 }
-function receitaCamisas(){ return vendas.reduce((s,v)=>s+Number(v.valor_pago||0),0); }
+// Contas marcadas para NÃO entrar no resumo geral (contabiliza=false).
+function contasSemTotal(){ return new Set(contas.filter(c=>c.contabiliza===false).map(c=>c.nome)); }
+function contaForaTotal(nome){ return !!nome && contas.some(c=>c.nome===nome && c.contabiliza===false); }
+function receitaFin(){ const s=contasSemTotal(); return fin.filter(d=>d.tipo==="receita" && !(d.conta&&s.has(d.conta))).reduce((a,d)=>a+Number(d.valor||0),0); }
+function despesaFin(){ const s=contasSemTotal(); return fin.filter(d=>d.tipo==="despesa" && !(d.conta&&s.has(d.conta))).reduce((a,d)=>a+Number(d.valor||0),0); }
+function receitaCamisas(){ const s=contasSemTotal(); return vendas.reduce((acc,v)=>{ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; if(pg.length) return acc+pg.reduce((a,p)=>a+((p.conta&&s.has(p.conta))?0:Number(p.valor||0)),0); return acc+Number(v.valor_pago||0); },0); }
 // Dinheiro fica no caixa; o resto (Pix/cartão/outros/sem forma) fica em conta.
 function saldoCaixaDinheiro(){
   const isDin=f=>(f||"").trim().toLowerCase()==="dinheiro";
@@ -904,7 +914,8 @@ function saldoCaixaDinheiro(){
     else if(Number(v.valor_pago)>0 && isDin(v.forma)){ caixa+=Number(v.valor_pago); }
   });
   triduo.forEach(t=>{ if(isDin(t.forma)) caixa+=Number(t.valor)||0; });
-  transferencias.forEach(t=>{ const val=Number(t.valor)||0; if(t.sentido==="caixa_conta") caixa-=val; else if(t.sentido==="conta_caixa") caixa+=val; });
+  const semT=contasSemTotal();
+  transferencias.forEach(t=>{ const val=Number(t.valor)||0; if((t.conta_de&&semT.has(t.conta_de))||(t.conta_para&&semT.has(t.conta_para))) return; if(t.sentido==="caixa_conta") caixa-=val; else if(t.sentido==="conta_caixa") caixa+=val; });
   reembolsos.forEach(r=>{ if(r.ressarcido && isDin(r.forma)) caixa-=Number(r.valor)||0; });
   filipetas.forEach(f=>{ if(f.pago && isDin(f.forma)) caixa+=Number(f.valor)||0; });
   return Math.round(caixa*100)/100;
@@ -914,8 +925,8 @@ function formaCelula(v){ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; c
 function contaCelula(v){ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; const cs=[...new Set(pg.map(p=>p.conta).filter(Boolean))]; if(cs.length>1) return `<span class="forma" title="${cs.join(', ')}">🏦 Vários</span>`; return cs[0]?("🏦 "+esc(cs[0])):"—"; }
 function anexo(url){ return url?`<a class="anexo" href="${url}" target="_blank" title="Ver comprovante">📎</a>`:""; }
 function renderFin(){
-  const recM=fin.filter(d=>d.tipo==="receita").reduce((s,d)=>s+Number(d.valor),0);
-  const desp=fin.filter(d=>d.tipo==="despesa").reduce((s,d)=>s+Number(d.valor),0)+despesaReembolsos();
+  const recM=receitaFin();
+  const desp=despesaFin()+despesaReembolsos();
   const rec=recM+receitaCamisas()+receitaTriduo()+receitaFilipetas();
   $("#totRec").textContent=brl(rec); $("#totDesp").textContent=brl(desp); $("#totSaldo").textContent=brl(rec-desp);
   $("#cardSaldo").classList.toggle("neg",(rec-desp)<0);
@@ -975,7 +986,7 @@ function editarTransf(id){ const t=transferencias.find(x=>x.id===id); if(!t)retu
   $("#btnAddTransf").textContent="Salvar alterações"; $("#btnCancelTransf").classList.remove("hide"); $("#formTransf").scrollIntoView({behavior:"smooth",block:"center"}); }
 
 /* ---------- REEMBOLSOS (gastos do bolso, a ressarcir) ---------- */
-function despesaReembolsos(){ return reembolsos.filter(r=>r.ressarcido).reduce((s,r)=>s+Number(r.valor||0),0); }
+function despesaReembolsos(){ const s=contasSemTotal(); return reembolsos.filter(r=>r.ressarcido).reduce((acc,r)=>acc+((r.conta&&s.has(r.conta))?0:Number(r.valor||0)),0); }
 function renderReembolsos(){
   if(!$("#reembCorpo")) return;
   const pend=reembolsos.filter(r=>!r.ressarcido).reduce((s,r)=>s+Number(r.valor||0),0);
@@ -1230,7 +1241,7 @@ async function salvarEntrega(id,entregue,obs,dataEntrega){
 
 /* ---------- TRÍDUO (noites x grupos) ---------- */
 function iconeGrupo(g){ const m={"Barraca":"🍢","Comidas e Bebidas":"🍢","Bazar":"🛍️","Leilão":"🔨","Oferta":"🙏","Rifa":"🎫","Bar":"🍺","Bingo":"🎱","Cozinha":"🍲","Doação":"🎁","Doações":"🎁","Filipetas":"🎟️","Camisas":"👕"}; return m[g]||"📌"; }
-function receitaTriduo(){ return triduo.reduce((s,t)=>s+Number(t.valor||0),0); }
+function receitaTriduo(){ const s=contasSemTotal(); return triduo.reduce((acc,t)=>acc+((t.conta&&s.has(t.conta))?0:Number(t.valor||0)),0); }
 function fillTriSelects(){
   const on='<option value="">— selecione —</option>'+NOITES.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
   const og='<option value="">— selecione —</option>'+GRUPOS_TRIDUO.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("");
@@ -1282,7 +1293,7 @@ function editarTri(id){ const t=triduo.find(x=>x.id===id); if(!t)return; editTri
   $("#painelTri").classList.remove("hide"); $("#btnAddTri").textContent="Salvar alterações"; $("#btnCancelTri").classList.remove("hide"); $("#painelTri").scrollIntoView({behavior:"smooth",block:"center"}); }
 
 /* ---------- FILIPETAS ---------- */
-function receitaFilipetas(){ return filipetas.filter(f=>f.pago).reduce((s,f)=>s+Number(f.valor||0),0); }
+function receitaFilipetas(){ const s=contasSemTotal(); return filipetas.filter(f=>f.pago).reduce((acc,f)=>acc+((f.conta&&s.has(f.conta))?0:Number(f.valor||0)),0); }
 function fillFilSelects(){
   const on='<option value="">— selecione —</option>'+NOITES.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
   const s=$("#filNoite"); if(s){ const a=s.value; s.innerHTML=on; if(NOITES.includes(a))s.value=a; }
@@ -1382,34 +1393,36 @@ function renderRelatorio(){
   const recCamisas=receitaCamisas();
   const recTri=receitaTriduo();
   const recFil=receitaFilipetas();
-  const recM=fin.filter(d=>d.tipo==="receita").reduce((s,d)=>s+Number(d.valor),0);
-  const desp=fin.filter(d=>d.tipo==="despesa").reduce((s,d)=>s+Number(d.valor),0)+despesaReembolsos();
+  const recM=receitaFin();
+  const desp=despesaFin()+despesaReembolsos();
   const rec=recM+recCamisas+recTri+recFil;
   $("#relRec").textContent=brl(rec); $("#relDesp").textContent=brl(desp);
   $("#relSaldo").textContent=brl(rec-desp); $("#relSaldo").style.color=(rec-desp)<0?"var(--vermelho)":"var(--azul)";
   const relCx=saldoCaixaDinheiro(); $("#relCaixa").textContent=brl(relCx); $("#relConta").textContent=brl((rec-desp)-relCx);
   if($("#relPorConta")){
     const contaTotal=(rec-desp)-relCx; let somaC=0;
-    let rowsC=contas.map(c=>{ const s=contaSaldo(c.nome); somaC+=s; return `<tr><td>🏦 ${esc(c.nome)}</td><td class="n">${brl(s)}</td></tr>`; }).join("");
+    let rowsC=contas.filter(c=>c.contabiliza!==false).map(c=>{ const s=contaSaldo(c.nome); somaC+=s; return `<tr><td>🏦 ${esc(c.nome)}</td><td class="n">${brl(s)}</td></tr>`; }).join("");
     const sem=Math.round((contaTotal-somaC)*100)/100;
     if(Math.abs(sem)>0.005) rowsC+=`<tr><td>❓ Pix/Cartão sem conta (a classificar)</td><td class="n" style="color:var(--laranja)">${brl(sem)}</td></tr>`;
     rowsC+=`<tr><td>💵 Caixa (dinheiro)</td><td class="n">${brl(relCx)}</td></tr>`;
     rowsC+=`<tr><td style="font-weight:700">Saldo total</td><td class="n" style="font-weight:700">${brl(rec-desp)}</td></tr>`;
+    contas.filter(c=>c.contabiliza===false).forEach(c=>{ rowsC+=`<tr><td style="color:#9aa7b2">🚫 ${esc(c.nome)} <small>(fora do total)</small></td><td class="n" style="color:#9aa7b2">${brl(contaSaldo(c.nome))}</td></tr>`; });
     $("#relPorConta").innerHTML=rowsC;
   }
   renderExtratoConta();
 
   // por categoria
-  const porCat=tp=>{ const m={}; fin.filter(d=>d.tipo===tp).forEach(d=>{ const k=d.categoria||"(sem categoria)"; m[k]=(m[k]||0)+Number(d.valor); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
+  const semTc=contasSemTotal();
+  const porCat=tp=>{ const m={}; fin.filter(d=>d.tipo===tp && !(d.conta&&semTc.has(d.conta))).forEach(d=>{ const k=d.categoria||"(sem categoria)"; m[k]=(m[k]||0)+Number(d.valor); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
   const recCats=porCat("receita").map(([k,v])=>[iconeGrupo(k)+" "+k,v]); if(recCamisas>0) recCats.push(["👕 Camisas (vendas pagas)",recCamisas]);
-  GRUPOS_TRIDUO.forEach(g=>{ const v=triduo.filter(t=>t.grupo===g).reduce((s,t)=>s+Number(t.valor||0),0); if(v>0) recCats.push([iconeGrupo(g)+" "+g,v]); });
+  GRUPOS_TRIDUO.forEach(g=>{ const v=triduo.filter(t=>t.grupo===g && !(t.conta&&semTc.has(t.conta))).reduce((s,t)=>s+Number(t.valor||0),0); if(v>0) recCats.push([iconeGrupo(g)+" "+g,v]); });
   if(recFil>0) recCats.push(["🎟️ Filipetas",recFil]);
   recCats.sort((a,b)=>b[1]-a[1]);
   const linhaCat=(arr,tot)=> (arr.length?arr.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${brl(v)}</td></tr>`).join(""):`<tr><td colspan="2" style="color:#9aa7b2">Nada lançado.</td></tr>`)
     +`<tr><td style="font-weight:700">Total</td><td class="n" style="font-weight:700">${brl(tot)}</td></tr>`;
   $("#relRecCat").innerHTML=linhaCat(recCats,rec);
   const despCats=porCat("despesa").map(([k,v])=>[iconeGrupo(k)+" "+k,v]);
-  const reembMap={}; reembolsos.filter(r=>r.ressarcido).forEach(r=>{ const k="💸 "+(r.categoria||"Reembolso")+(r.pessoa?" ("+r.pessoa+")":""); reembMap[k]=(reembMap[k]||0)+Number(r.valor||0); });
+  const reembMap={}; reembolsos.filter(r=>r.ressarcido && !(r.conta&&semTc.has(r.conta))).forEach(r=>{ const k="💸 "+(r.categoria||"Reembolso")+(r.pessoa?" ("+r.pessoa+")":""); reembMap[k]=(reembMap[k]||0)+Number(r.valor||0); });
   Object.entries(reembMap).forEach(([k,v])=>despCats.push([k,v])); despCats.sort((a,b)=>b[1]-a[1]);
   $("#relDespCat").innerHTML=linhaCat(despCats,desp);
 
@@ -1417,11 +1430,11 @@ function renderRelatorio(){
   const formas=["Dinheiro","Pix","Cartão","Outro","(sem informar)"];
   const key=f=>f||"(sem informar)";
   const ent={}, sai={};
-  fin.forEach(d=>{ const t=d.tipo==="receita"?ent:sai; const k=key(d.forma); t[k]=(t[k]||0)+Number(d.valor); });
-  vendas.forEach(v=>{ if(Number(v.valor_pago)>0){ const k=key(v.forma); ent[k]=(ent[k]||0)+Number(v.valor_pago); } });
-  triduo.forEach(t=>{ if(Number(t.valor)>0){ const k=key(t.forma); ent[k]=(ent[k]||0)+Number(t.valor); } });
-  reembolsos.forEach(r=>{ if(r.ressarcido){ const k=key(r.forma); sai[k]=(sai[k]||0)+Number(r.valor||0); } });
-  filipetas.forEach(f=>{ if(f.pago){ const k=key(f.forma); ent[k]=(ent[k]||0)+Number(f.valor||0); } });
+  fin.forEach(d=>{ if(d.conta&&semTc.has(d.conta)) return; const t=d.tipo==="receita"?ent:sai; const k=key(d.forma); t[k]=(t[k]||0)+Number(d.valor); });
+  vendas.forEach(v=>{ (Array.isArray(v.pagamentos)?v.pagamentos:[]).forEach(p=>{ if(p.conta&&semTc.has(p.conta)) return; const k=key(p.forma); ent[k]=(ent[k]||0)+Number(p.valor||0); }); });
+  triduo.forEach(t=>{ if(t.conta&&semTc.has(t.conta)) return; if(Number(t.valor)>0){ const k=key(t.forma); ent[k]=(ent[k]||0)+Number(t.valor); } });
+  reembolsos.forEach(r=>{ if(r.ressarcido && !(r.conta&&semTc.has(r.conta))){ const k=key(r.forma); sai[k]=(sai[k]||0)+Number(r.valor||0); } });
+  filipetas.forEach(f=>{ if(f.pago && !(f.conta&&semTc.has(f.conta))){ const k=key(f.forma); ent[k]=(ent[k]||0)+Number(f.valor||0); } });
   const usadas=formas.filter(f=>ent[f]||sai[f]);
   $("#relForma").innerHTML=(usadas.length?usadas.map(f=>`<tr><td>${f}</td><td class="n">${brl(ent[f]||0)}</td><td class="n">${brl(sai[f]||0)}</td></tr>`).join(""):`<tr><td colspan="3" style="color:#9aa7b2">Sem lançamentos.</td></tr>`)
     +`<tr><td style="font-weight:700">Total</td><td class="n" style="font-weight:700">${brl(Object.values(ent).reduce((s,x)=>s+x,0))}</td><td class="n" style="font-weight:700">${brl(Object.values(sai).reduce((s,x)=>s+x,0))}</td></tr>`;
