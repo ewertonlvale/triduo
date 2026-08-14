@@ -293,6 +293,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       <select id="filtroTipo"><option value="">Todos os tipos</option><option value="receita">Só receitas</option><option value="despesa">Só despesas</option></select>
       <select id="filtroFormaFin"><option value="">Forma: todas</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select>
       <select id="filtroContaFin"><option value="">Conta: todas</option></select>
+      <select id="filtroOficial"><option value="">Oficial: todos</option><option value="sim">Só oficiais</option><option value="nao">Só não oficiais</option></select>
       <select id="filtroCatFin"><option value="">Categoria: todas</option></select>
       <div style="display:flex;flex-direction:column;gap:2px;font-size:.68rem;color:#7a8896"><span>De</span><input type="date" id="filtroDataDe" style="min-width:130px"></div>
       <div style="display:flex;flex-direction:column;gap:2px;font-size:.68rem;color:#7a8896"><span>Até</span><input type="date" id="filtroDataAte" style="min-width:130px"></div>
@@ -504,12 +505,12 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
 
       <div class="rel-sec">
         <h3>Receitas por categoria</h3>
-        <table class="rel"><tbody id="relRecCat"></tbody></table>
+        <table class="rel"><thead><tr><th></th><th class="n">Real</th><th class="n">Oficial</th></tr></thead><tbody id="relRecCat"></tbody></table>
       </div>
 
       <div class="rel-sec">
         <h3>Despesas por categoria</h3>
-        <table class="rel"><tbody id="relDespCat"></tbody></table>
+        <table class="rel"><thead><tr><th></th><th class="n">Real</th><th class="n">Oficial</th></tr></thead><tbody id="relDespCat"></tbody></table>
       </div>
 
       <div class="rel-sec">
@@ -721,7 +722,8 @@ function ligarEventos(){
   $("#btnRec").onclick=()=>setTipo("receita"); $("#btnDesp").onclick=()=>setTipo("despesa");
   $("#busca").oninput=renderFin; $("#filtroTipo").onchange=renderFin; $("#filtroFormaFin").onchange=renderFin;
   $("#filtroCatFin").onchange=renderFin; $("#filtroDataDe").onchange=renderFin; $("#filtroDataAte").onchange=renderFin; $("#filtroContaFin").onchange=renderFin;
-  $("#btnLimparFin").onclick=()=>{ ["#busca","#filtroTipo","#filtroFormaFin","#filtroContaFin","#filtroCatFin","#filtroDataDe","#filtroDataAte"].forEach(s=>{ if($(s))$(s).value=""; }); renderFin(); };
+  if($("#filtroOficial")) $("#filtroOficial").onchange=renderFin;
+  $("#btnLimparFin").onclick=()=>{ ["#busca","#filtroTipo","#filtroFormaFin","#filtroContaFin","#filtroCatFin","#filtroDataDe","#filtroDataAte","#filtroOficial"].forEach(s=>{ if($(s))$(s).value=""; }); renderFin(); };
   $("#btnReload").onclick=carregarTudo; $("#formFin").onsubmit=addFin;
   $("#btnExportTudo").onclick=exportarTudo;
   $("#btnExportExtratos").onclick=exportarExtratos;
@@ -953,9 +955,10 @@ function renderFin(){
   const catsFin=[...new Set([...categorias.map(c=>c.nome),...fin.map(d=>d.categoria)].filter(Boolean))].sort((a,b)=>a.localeCompare(b));
   const fcSel=$("#filtroCatFin"); if(fcSel){ const a=fcSel.value; fcSel.innerHTML='<option value="">Categoria: todas</option>'+catsFin.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join(""); if(catsFin.includes(a)) fcSel.value=a; }
   const q=$("#busca").value.toLowerCase(), ft=$("#filtroTipo").value, ff=$("#filtroFormaFin")?$("#filtroFormaFin").value:"";
-  const fc=$("#filtroCatFin")?$("#filtroCatFin").value:"", fDe=$("#filtroDataDe")?$("#filtroDataDe").value:"", fAte=$("#filtroDataAte")?$("#filtroDataAte").value:"", fConta=$("#filtroContaFin")?$("#filtroContaFin").value:"";
+  const fc=$("#filtroCatFin")?$("#filtroCatFin").value:"", fDe=$("#filtroDataDe")?$("#filtroDataDe").value:"", fAte=$("#filtroDataAte")?$("#filtroDataAte").value:"", fConta=$("#filtroContaFin")?$("#filtroContaFin").value:"", fOfic=$("#filtroOficial")?$("#filtroOficial").value:"";
   const lista=fin.filter(d=>{
     if(ft&&d.tipo!==ft) return false;
+    if(fOfic==="sim"&&d.oficial===false) return false; if(fOfic==="nao"&&d.oficial!==false) return false;
     if(ff&&(d.forma||"")!==ff) return false;
     if(fConta==="__sem"&&d.conta) return false; if(fConta&&fConta!=="__sem"&&(d.conta||"")!==fConta) return false;
     if(fc&&(d.categoria||"")!==fc) return false;
@@ -1428,11 +1431,13 @@ function renderRelatorio(){
   }
   renderExtratoConta();
 
+  const semTc=contasSemTotal();
+  const recOfic=receitaFinOficial()+recTri+recFil;
+  const despOfic=despesaFinOficial()+despesaReembolsosOficial();
+
   // Real × Oficial
   if($("#relRealOficial")){
     const recRealV=rec, despRealV=desp, saldoRealV=rec-desp;
-    const recOfic=receitaFinOficial()+recTri+recFil;
-    const despOfic=despesaFinOficial()+despesaReembolsosOficial();
     const saldoOfic=recOfic-despOfic;
     const linha=(rot,a,b,bold)=>`<tr${bold?' style="font-weight:700"':''}><td>${rot}</td><td class="n" style="color:var(--verde)">${brl(a)}</td><td class="n" style="color:var(--azul)">${brl(b)}</td></tr>`;
     $("#relRealOficial").innerHTML=
@@ -1442,20 +1447,22 @@ function renderRelatorio(){
       linha("Saldo",saldoRealV,saldoOfic,true);
   }
 
-  // por categoria
-  const semTc=contasSemTotal();
-  const porCat=tp=>{ const m={}; fin.filter(d=>d.tipo===tp && !(d.conta&&semTc.has(d.conta))).forEach(d=>{ const k=d.categoria||"(sem categoria)"; m[k]=(m[k]||0)+Number(d.valor); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
-  const recCats=porCat("receita").map(([k,v])=>[iconeGrupo(k)+" "+k,v]); if(recCamisas>0) recCats.push(["👕 Camisas (vendas pagas)",recCamisas]);
-  GRUPOS_TRIDUO.forEach(g=>{ const v=triduo.filter(t=>t.grupo===g && !(t.conta&&semTc.has(t.conta))).reduce((s,t)=>s+Number(t.valor||0),0); if(v>0) recCats.push([iconeGrupo(g)+" "+g,v]); });
-  if(recFil>0) recCats.push(["🎟️ Filipetas",recFil]);
+  // por categoria (Real × Oficial)
+  const porCatRO=tp=>{ const mr={}, mo={}; fin.filter(d=>d.tipo===tp && !(d.conta&&semTc.has(d.conta))).forEach(d=>{ const k=d.categoria||"(sem categoria)"; mr[k]=(mr[k]||0)+Number(d.valor); if(d.oficial!==false) mo[k]=(mo[k]||0)+Number(d.valor); }); return {mr,mo}; };
+  const rr=porCatRO("receita");
+  const recCats=Object.keys(rr.mr).map(k=>[iconeGrupo(k)+" "+k, rr.mr[k], rr.mo[k]||0]);
+  if(recCamisas>0) recCats.push(["👕 Camisas (vendas pagas)",recCamisas,0]);
+  GRUPOS_TRIDUO.forEach(g=>{ const v=triduo.filter(t=>t.grupo===g && !(t.conta&&semTc.has(t.conta))).reduce((s,t)=>s+Number(t.valor||0),0); if(v>0) recCats.push([iconeGrupo(g)+" "+g,v,v]); });
+  if(recFil>0) recCats.push(["🎟️ Filipetas",recFil,recFil]);
   recCats.sort((a,b)=>b[1]-a[1]);
-  const linhaCat=(arr,tot)=> (arr.length?arr.map(([k,v])=>`<tr><td>${esc(k)}</td><td class="n">${brl(v)}</td></tr>`).join(""):`<tr><td colspan="2" style="color:#9aa7b2">Nada lançado.</td></tr>`)
-    +`<tr><td style="font-weight:700">Total</td><td class="n" style="font-weight:700">${brl(tot)}</td></tr>`;
-  $("#relRecCat").innerHTML=linhaCat(recCats,rec);
-  const despCats=porCat("despesa").map(([k,v])=>[iconeGrupo(k)+" "+k,v]);
-  const reembMap={}; reembolsos.filter(r=>r.ressarcido && !(r.conta&&semTc.has(r.conta))).forEach(r=>{ const k="💸 "+(r.categoria||"Reembolso")+(r.pessoa?" ("+r.pessoa+")":""); reembMap[k]=(reembMap[k]||0)+Number(r.valor||0); });
-  Object.entries(reembMap).forEach(([k,v])=>despCats.push([k,v])); despCats.sort((a,b)=>b[1]-a[1]);
-  $("#relDespCat").innerHTML=linhaCat(despCats,desp);
+  const linhaCat=(arr,tR,tO)=> (arr.length?arr.map(([k,vr,vo])=>`<tr><td>${esc(k)}</td><td class="n">${brl(vr)}</td><td class="n" style="color:var(--azul)">${vo?brl(vo):"—"}</td></tr>`).join(""):`<tr><td colspan="3" style="color:#9aa7b2">Nada lançado.</td></tr>`)
+    +`<tr style="font-weight:700"><td>Total</td><td class="n">${brl(tR)}</td><td class="n" style="color:var(--azul)">${brl(tO)}</td></tr>`;
+  $("#relRecCat").innerHTML=linhaCat(recCats,rec,recOfic);
+  const dd=porCatRO("despesa");
+  const despCats=Object.keys(dd.mr).map(k=>[iconeGrupo(k)+" "+k, dd.mr[k], dd.mo[k]||0]);
+  const remR={}, remO={}; reembolsos.filter(r=>r.ressarcido && !(r.conta&&semTc.has(r.conta))).forEach(r=>{ const k="💸 "+(r.categoria||"Reembolso")+(r.pessoa?" ("+r.pessoa+")":""); remR[k]=(remR[k]||0)+Number(r.valor||0); if(r.oficial!==false) remO[k]=(remO[k]||0)+Number(r.valor||0); });
+  Object.keys(remR).forEach(k=>despCats.push([k,remR[k],remO[k]||0])); despCats.sort((a,b)=>b[1]-a[1]);
+  $("#relDespCat").innerHTML=linhaCat(despCats,desp,despOfic);
 
   // por forma
   const formas=["Dinheiro","Pix","Cartão","Outro","(sem informar)"];
