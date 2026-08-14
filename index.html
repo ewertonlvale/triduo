@@ -61,9 +61,10 @@
   .barra input,.barra select{width:auto; flex:1; min-width:110px}
   .btn-sec{padding:9px 12px; border:1px solid var(--borda); background:#fff; border-radius:8px; cursor:pointer; font-size:.85rem; font-weight:600; color:var(--azul)}
   .btn-sec:hover{background:#eef2f5}
-  .lista{background:#fff; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.06); overflow-x:auto; margin-bottom:18px}
+  .lista{background:#fff; border-radius:12px; box-shadow:0 1px 3px rgba(0,0,0,.06); overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:18px}
   table{width:100%; border-collapse:collapse; font-size:.86rem}
-  th,td{padding:10px 9px; text-align:left; border-bottom:1px solid var(--borda); white-space:nowrap}
+  th,td{padding:9px 7px; text-align:left; border-bottom:1px solid var(--borda); white-space:nowrap}
+  td.wrap{white-space:normal; min-width:150px}
   td.num,th.num{text-align:right}
   td.valor{text-align:right; font-weight:600}
   td.valor.rec{color:var(--verde)} td.valor.desp{color:var(--vermelho)}
@@ -75,8 +76,9 @@
   .forma{display:inline-block; padding:2px 7px; border-radius:6px; font-size:.68rem; font-weight:600; background:#eef2f5; color:#5a6b7a}
   .forma.pix{background:#e0f2f1; color:#00897b} .forma.dinheiro{background:#e8f5e9; color:#2e7d32}
   .forma.cartao{background:#ede7f6; color:#5e35b1}
-  .chip{display:inline-flex; align-items:center; gap:6px; background:#eef2f5; border-radius:20px; padding:5px 6px 5px 12px; font-size:.82rem; margin:3px}
+  .chip{display:inline-flex; align-items:center; gap:6px; background:#eef2f5; border-radius:20px; padding:5px 6px 5px 12px; font-size:.82rem; margin:3px; white-space:nowrap}
   .chip small{color:#9aa7b2}
+  .chip .selo{flex:none; white-space:nowrap; border:none; border-radius:10px; padding:2px 9px; font-size:.72rem; cursor:pointer}
   .chip button{background:#dbe3ea; border:none; width:20px; height:20px; border-radius:50%; cursor:pointer; color:#5a6b7a; font-weight:700}
   .anexo{color:var(--roxo); text-decoration:none; font-size:1rem}
   .del{background:none; border:none; color:#c0392b; cursor:pointer; font-size:1rem; padding:2px 6px; border-radius:6px}
@@ -279,6 +281,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <div class="campo"><label for="finPagador">Identificador (nome no Pix / extrato)</label><input type="text" id="finPagador" placeholder="Ex.: nome no Pix"></div>
         <div class="campo"><label for="responsavel">Responsável</label><input type="text" id="responsavel" placeholder="Quem registrou"></div>
         <div class="campo full"><label for="detalhamento">Detalhamento (opcional)</label><textarea id="detalhamento" rows="2" placeholder="Observações, itens do gasto, contexto..." style="padding:10px;border:1px solid var(--borda);border-radius:8px;font-size:16px;font-family:inherit;resize:vertical;width:100%"></textarea></div>
+        <div class="campo full"><label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer"><input type="checkbox" id="finOficial" checked style="width:auto"> Lançamento <b>oficial</b> (entra na contabilização oficial da prestação de contas)</label></div>
         <div class="campo"><label for="finFile">Comprovante (opcional)</label><input type="file" id="finFile" accept="image/*,.pdf"></div>
         <button type="submit" class="btn-add" id="btnAddFin">+ Adicionar lançamento</button>
         <button type="button" class="btn-add hide" id="btnCancelFin" style="background:#7a8896">Cancelar edição</button>
@@ -491,6 +494,15 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
       </div>
 
       <div class="rel-sec">
+        <h3>Contabilização: Real × Oficial</h3>
+        <p style="font-size:.8rem;color:#7a8896;margin:0 0 8px">A <b>oficial</b> inclui Tríduo, Filipetas e os lançamentos do Financeiro marcados como oficiais. <b>Não inclui Camisas</b> nem lançamentos marcados como não oficiais.</p>
+        <table class="rel">
+          <thead><tr><th></th><th class="n">Real</th><th class="n">Oficial</th></tr></thead>
+          <tbody id="relRealOficial"></tbody>
+        </table>
+      </div>
+
+      <div class="rel-sec">
         <h3>Receitas por categoria</h3>
         <table class="rel"><tbody id="relRecCat"></tbody></table>
       </div>
@@ -602,6 +614,7 @@ create policy "comp_apagar" on storage.objects for delete using (bucket_id='comp
         <div class="campo"><label for="rData">Data do gasto</label><input type="date" id="rData" required></div>
         <div class="campo"><label for="rForma">Forma de pagamento</label><select id="rForma"><option value="">— definir ao ressarcir —</option><option>Dinheiro</option><option>Pix</option><option>Cartão</option><option>Outro</option></select></div>
         <div class="campo"><label for="rConta">Conta (opcional)</label><select id="rConta"><option value="">— conta —</option></select></div>
+        <div class="campo full"><label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer"><input type="checkbox" id="rOficial" checked style="width:auto"> Despesa <b>oficial</b> (entra na contabilização oficial)</label></div>
         <div class="campo full"><label for="rFile">Comprovante (opcional)</label><input type="file" id="rFile" accept="image/*,.pdf"></div>
         <button type="submit" class="btn-add" id="btnAddReemb" style="background:var(--laranja)">+ Registrar reembolso pendente</button>
         <button type="button" class="btn-add hide" id="btnCancelReemb" style="background:#7a8896">Cancelar edição</button>
@@ -728,7 +741,7 @@ function ligarEventos(){
   $("#reembCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],[data-rss],[data-desfazer],.del"); if(!t) return;
     if(t.classList.contains("del")){ if(confirm("Excluir este reembolso?")) delFrom("reembolsos",t.dataset.id); return; }
     if(t.dataset.edit){ editarReemb(t.dataset.edit); return; }
-    if(t.dataset.rss){ const fs=$("#reembCorpo").querySelector('.rss-forma[data-id="'+t.dataset.rss+'"]'); const cs=$("#reembCorpo").querySelector('.rss-conta[data-id="'+t.dataset.rss+'"]'); ressarcir(t.dataset.rss, fs?fs.value:"Dinheiro", cs?cs.value:""); return; }
+    if(t.dataset.rss){ const r=reembolsos.find(x=>x.id===t.dataset.rss); ressarcir(t.dataset.rss, (r&&r.forma)||"Dinheiro", (r&&r.conta)||""); return; }
     if(t.dataset.desfazer){ desfazerReemb(t.dataset.desfazer); return; }
   };
   $("#btnCancelReemb").onclick=cancelarEdicaoReemb;
@@ -835,7 +848,7 @@ function fillContaSelects(){
 function renderContas(){
   if(!$("#contaChips")) return;
   $("#contaChips").innerHTML=contas.length?contas.map(c=>{ const fora=c.contabiliza===false;
-    const badge=fora?`<button data-toggle="${c.id}" title="Está fora do resumo geral — clique para incluir" style="border:none;background:#ffe3e3;color:#c92a2a;border-radius:10px;padding:1px 7px;font-size:.72rem;cursor:pointer">🚫 fora do total</button>`:`<button data-toggle="${c.id}" title="Entra no resumo geral — clique para deixar fora" style="border:none;background:#d3f9d8;color:#2b8a3e;border-radius:10px;padding:1px 7px;font-size:.72rem;cursor:pointer">✓ no total</button>`;
+    const badge=fora?`<button class="selo" data-toggle="${c.id}" title="Está fora do resumo geral — clique para incluir" style="background:#ffe3e3;color:#c92a2a">🚫 fora do total</button>`:`<button class="selo" data-toggle="${c.id}" title="Entra no resumo geral — clique para deixar fora" style="background:#d3f9d8;color:#2b8a3e">✓ no total</button>`;
     return `<span class="chip"${fora?' style="opacity:.7"':''}>🏦 ${esc(c.nome)} ${badge} <button data-del="${c.id}" title="Remover">×</button></span>`; }).join(""):'<span style="color:#9aa7b2;font-size:.85rem">Nenhuma conta cadastrada.</span>';
 }
 async function addConta(e){
@@ -873,7 +886,7 @@ function editarFin(id){
   editFinId=id; setTipo(d.tipo);
   $("#desc").value=d.descricao||""; $("#valor").value=d.valor;
   $("#forma").value=d.forma||""; $("#data").value=d.data||hoje(); $("#responsavel").value=d.responsavel||""; $("#finPagador").value=d.identificador||""; $("#detalhamento").value=d.detalhamento||"";
-  $("#categoria").value=d.categoria||""; if($("#finConta"))$("#finConta").value=d.conta||"";
+  $("#categoria").value=d.categoria||""; if($("#finConta"))$("#finConta").value=d.conta||""; if($("#finOficial"))$("#finOficial").checked=d.oficial!==false;
   if(d.categoria && $("#categoria").value!==d.categoria){ $("#categoria").insertAdjacentHTML("beforeend",`<option value="${esc(d.categoria)}">${esc(d.categoria)}</option>`); $("#categoria").value=d.categoria; }
   $("#finFile").value="";
   $("#painelFin").classList.remove("hide");
@@ -889,7 +902,7 @@ async function addFin(e){
   let url=null;
   try{ if(temArquivo) url=await subirComprovante($("#finFile"),"financeiro"); }
   catch(err){ $("#btnAddFin").disabled=false; $("#btnAddFin").textContent=rotuloBtnFin(); return; }
-  const reg={tipo,descricao:$("#desc").value.trim(),valor:v,categoria:$("#categoria").value,forma:$("#forma").value,conta:($("#finConta").value||null),data:$("#data").value,responsavel:$("#responsavel").value.trim(),identificador:$("#finPagador").value.trim(),detalhamento:$("#detalhamento").value.trim()};
+  const reg={tipo,descricao:$("#desc").value.trim(),valor:v,categoria:$("#categoria").value,forma:$("#forma").value,conta:($("#finConta").value||null),data:$("#data").value,responsavel:$("#responsavel").value.trim(),identificador:$("#finPagador").value.trim(),detalhamento:$("#detalhamento").value.trim(),oficial:$("#finOficial")?$("#finOficial").checked:true};
   if(temArquivo) reg.comprovante_url=url;
   let error;
   if(editFinId){ ({error}=await sb.from("lancamentos").update(reg).eq("id",editFinId)); }
@@ -903,6 +916,10 @@ function contasSemTotal(){ return new Set(contas.filter(c=>c.contabiliza===false
 function contaForaTotal(nome){ return !!nome && contas.some(c=>c.nome===nome && c.contabiliza===false); }
 function receitaFin(){ const s=contasSemTotal(); return fin.filter(d=>d.tipo==="receita" && !(d.conta&&s.has(d.conta))).reduce((a,d)=>a+Number(d.valor||0),0); }
 function despesaFin(){ const s=contasSemTotal(); return fin.filter(d=>d.tipo==="despesa" && !(d.conta&&s.has(d.conta))).reduce((a,d)=>a+Number(d.valor||0),0); }
+// Oficial: só Financeiro marcado como oficial (Tríduo/Filipetas entram sempre; Camisas nunca).
+function receitaFinOficial(){ const s=contasSemTotal(); return fin.filter(d=>d.tipo==="receita" && d.oficial!==false && !(d.conta&&s.has(d.conta))).reduce((a,d)=>a+Number(d.valor||0),0); }
+function despesaFinOficial(){ const s=contasSemTotal(); return fin.filter(d=>d.tipo==="despesa" && d.oficial!==false && !(d.conta&&s.has(d.conta))).reduce((a,d)=>a+Number(d.valor||0),0); }
+function despesaReembolsosOficial(){ const s=contasSemTotal(); return reembolsos.filter(r=>r.ressarcido && r.oficial!==false && !(r.conta&&s.has(r.conta))).reduce((a,r)=>a+Number(r.valor||0),0); }
 function receitaCamisas(){ const s=contasSemTotal(); return vendas.reduce((acc,v)=>{ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; if(pg.length) return acc+pg.reduce((a,p)=>a+((p.conta&&s.has(p.conta))?0:Number(p.valor||0)),0); return acc+Number(v.valor_pago||0); },0); }
 // Dinheiro fica no caixa; o resto (Pix/cartão/outros/sem forma) fica em conta.
 function saldoCaixaDinheiro(){
@@ -946,7 +963,7 @@ function renderFin(){
     if(fAte&&(d.data||"")>fAte) return false;
     if(q&&!((d.descricao||"")+" "+(d.categoria||"")+" "+(d.responsavel||"")+" "+(d.detalhamento||"")+" "+(d.identificador||"")).toLowerCase().includes(q)) return false; return true; });
   $("#corpoFin").innerHTML=lista.map(d=>{ const s=d.tipo==="receita"?"+":"−", c=d.tipo==="receita"?"rec":"desp";
-    return `<tr><td>${fmtData(d.data)}</td><td><b>${esc(d.descricao)||"—"}</b> <span class="tag ${c}">${d.tipo==="receita"?"Rec.":"Desp."}</span>${d.identificador?`<div style="font-size:.78rem;color:#7a8896">👤 ${esc(d.identificador)}</div>`:""}${d.detalhamento?`<div style="font-size:.8rem;color:#7a8896;white-space:normal;max-width:320px">${esc(d.detalhamento)}</div>`:""}</td><td>${esc(d.categoria)||"—"}</td><td>${formaTag(d.forma)||"—"}</td><td>${d.conta?"🏦 "+esc(d.conta):"—"}</td><td>${esc(d.responsavel)||"—"}</td><td class="valor ${c}">${s} ${brl(d.valor)}</td><td>${anexo(d.comprovante_url)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${d.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${d.id}" title="Excluir">🗑</button></td></tr>`; }).join("");
+    return `<tr><td>${fmtData(d.data)}</td><td class="wrap" style="max-width:280px"><b>${esc(d.descricao)||"—"}</b> <span class="tag ${c}">${d.tipo==="receita"?"Rec.":"Desp."}</span>${d.oficial===false?' <span class="tag" style="background:#f1f3f5;color:#868e96">não oficial</span>':""}${d.identificador?`<div style="font-size:.78rem;color:#7a8896">👤 ${esc(d.identificador)}</div>`:""}${d.detalhamento?`<div style="font-size:.8rem;color:#7a8896;white-space:normal;max-width:320px">${esc(d.detalhamento)}</div>`:""}</td><td>${esc(d.categoria)||"—"}</td><td>${formaTag(d.forma)||"—"}</td><td>${d.conta?"🏦 "+esc(d.conta):"—"}</td><td>${esc(d.responsavel)||"—"}</td><td class="valor ${c}">${s} ${brl(d.valor)}</td><td>${anexo(d.comprovante_url)}</td><td><button class="btn-sec" style="padding:4px 8px" data-edit="${d.id}" title="Editar">✏️</button></td><td><button class="del" data-id="${d.id}" title="Excluir">🗑</button></td></tr>`; }).join("");
   $("#vazioFin").style.display=lista.length?"none":"block"; $("#vazioFin").textContent="Nenhum lançamento ainda.";
   const sf=lista.reduce((s,d)=>s+(d.tipo==="receita"?Number(d.valor):-Number(d.valor)),0);
   $("#footFin").textContent=brl(sf);
@@ -995,9 +1012,9 @@ function renderReembolsos(){
   const lista=[...reembolsos].sort((a,b)=>((a.ressarcido?1:0)-(b.ressarcido?1:0))||(b.data||"").localeCompare(a.data||""));
   const fopts=f=>['Dinheiro','Pix','Cartão','Outro'].map(x=>`<option${x===(f||'Dinheiro')?' selected':''}>${x}</option>`).join("");
   $("#reembCorpo").innerHTML=lista.map(r=>{
-    const acao=r.ressarcido?`<span class="tag pago">Ressarcido</span> ${r.forma?formaTag(r.forma):""} ${r.data_ressarcimento?`<span style="color:#7a8896;font-size:.75rem">${fmtData(r.data_ressarcimento)}</span>`:""}`:`<span class="tag pend">Pendente</span>`;
-    const botoes=r.ressarcido?`<button class="btn-sec" style="padding:4px 8px" data-desfazer="${r.id}">Desfazer</button>`:`<select class="rss-forma" data-id="${r.id}" style="padding:5px;font-size:.78rem">${fopts(r.forma)}</select> <select class="rss-conta" data-id="${r.id}" style="padding:5px;font-size:.78rem">${optsConta("")}</select> <button class="btn-sec" style="padding:4px 8px;background:var(--verde);color:#fff;border:none" data-rss="${r.id}">✓ Ressarcir</button>`;
-    return `<tr><td>${fmtData(r.data)}</td><td>${esc(r.pessoa)||"—"}</td><td><b>${esc(r.descricao)||"—"}</b>${r.categoria?` <span style="color:#7a8896;font-size:.78rem">${esc(r.categoria)}</span>`:""} ${anexo(r.comprovante_url)}</td><td class="num">${brl(r.valor)}</td><td>${acao}</td><td>${botoes}</td><td style="white-space:nowrap"><button class="btn-sec" style="padding:4px 8px" data-edit="${r.id}" title="Editar">✏️</button> <button class="del" data-id="${r.id}" title="Excluir">🗑</button></td></tr>`;
+    const acao=r.ressarcido?`<span class="tag pago">Ressarcido</span> ${r.forma?formaTag(r.forma):""}${r.conta?` <span style="color:#7a8896;font-size:.72rem">🏦 ${esc(r.conta)}</span>`:""} ${r.data_ressarcimento?`<span style="color:#7a8896;font-size:.75rem">${fmtData(r.data_ressarcimento)}</span>`:""}`:`<span class="tag pend">Pendente</span>${r.forma?" "+formaTag(r.forma):""}`;
+    const botoes=r.ressarcido?`<button class="btn-sec" style="padding:4px 8px" data-desfazer="${r.id}">Desfazer</button>`:`<button class="btn-sec" style="padding:5px 10px;background:var(--verde);color:#fff;border:none" data-rss="${r.id}" title="Marcar como ressarcido (usa a forma/conta do registro; edite no ✏️ para mudar)">✓ Ressarcir</button>`;
+    return `<tr><td>${fmtData(r.data)}</td><td>${esc(r.pessoa)||"—"}</td><td><b>${esc(r.descricao)||"—"}</b>${r.categoria?` <span style="color:#7a8896;font-size:.78rem">${esc(r.categoria)}</span>`:""} ${anexo(r.comprovante_url)}</td><td class="num">${brl(r.valor)}</td><td>${acao}</td><td style="white-space:nowrap">${botoes} <button class="btn-sec" style="padding:4px 8px" data-edit="${r.id}" title="Editar">✏️</button> <button class="del" data-id="${r.id}" title="Excluir">🗑</button></td></tr>`;
   }).join("");
   $("#reembVazio").style.display=lista.length?"none":"block";
 }
@@ -1011,7 +1028,7 @@ function editarReemb(id){
   editReembId=id;
   $("#rDesc").value=r.descricao||""; $("#rPessoa").value=r.pessoa||"";
   $("#rValor").value=r.valor; $("#rCat").value=r.categoria||""; $("#rData").value=r.data||hoje();
-  $("#rForma").value=r.forma||""; if($("#rConta")) $("#rConta").value=r.conta||"";
+  $("#rForma").value=r.forma||""; if($("#rConta")) $("#rConta").value=r.conta||""; if($("#rOficial")) $("#rOficial").checked=r.oficial!==false;
   $("#rFile").value="";
   $("#btnAddReemb").textContent="Salvar alterações"; $("#btnCancelReemb").classList.remove("hide");
   $("#formReemb").scrollIntoView({behavior:"smooth",block:"center"});
@@ -1024,7 +1041,7 @@ async function addReemb(e){
   $("#btnAddReemb").disabled=true;
   let url=null; try{ if(temArquivo) url=await subirComprovante($("#rFile"),"reembolsos"); }catch(err){ $("#btnAddReemb").disabled=false; return; }
   const forma=$("#rForma").value;
-  const reg={descricao:$("#rDesc").value.trim(),pessoa:$("#rPessoa").value.trim(),valor:v,categoria:$("#rCat").value.trim(),data:$("#rData").value,forma:forma||null,conta:($("#rConta").value||null)};
+  const reg={descricao:$("#rDesc").value.trim(),pessoa:$("#rPessoa").value.trim(),valor:v,categoria:$("#rCat").value.trim(),data:$("#rData").value,forma:forma||null,conta:($("#rConta").value||null),oficial:$("#rOficial")?$("#rOficial").checked:true};
   if(temArquivo) reg.comprovante_url=url;
   let error;
   if(editReembId){ ({error}=await sb.from("reembolsos").update(reg).eq("id",editReembId)); }
@@ -1411,6 +1428,20 @@ function renderRelatorio(){
   }
   renderExtratoConta();
 
+  // Real × Oficial
+  if($("#relRealOficial")){
+    const recRealV=rec, despRealV=desp, saldoRealV=rec-desp;
+    const recOfic=receitaFinOficial()+recTri+recFil;
+    const despOfic=despesaFinOficial()+despesaReembolsosOficial();
+    const saldoOfic=recOfic-despOfic;
+    const linha=(rot,a,b,bold)=>`<tr${bold?' style="font-weight:700"':''}><td>${rot}</td><td class="n" style="color:var(--verde)">${brl(a)}</td><td class="n" style="color:var(--azul)">${brl(b)}</td></tr>`;
+    $("#relRealOficial").innerHTML=
+      linha("Receitas",recRealV,recOfic)+
+      `<tr><td style="padding-left:18px;color:#7a8896">↳ Camisas (só na real)</td><td class="n" style="color:#7a8896">${brl(recCamisas)}</td><td class="n" style="color:#7a8896">—</td></tr>`+
+      linha("Despesas",despRealV,despOfic)+
+      linha("Saldo",saldoRealV,saldoOfic,true);
+  }
+
   // por categoria
   const semTc=contasSemTotal();
   const porCat=tp=>{ const m={}; fin.filter(d=>d.tipo===tp && !(d.conta&&semTc.has(d.conta))).forEach(d=>{ const k=d.categoria||"(sem categoria)"; m[k]=(m[k]||0)+Number(d.valor); }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
@@ -1512,14 +1543,14 @@ function exportarTudo(){
   if(typeof XLSX==="undefined"){ alert("Biblioteca de Excel não carregou. Verifique a internet e recarregue."); return; }
   const wb=XLSX.utils.book_new();
   const add=(nome,arr)=>{ const ws=XLSX.utils.json_to_sheet(arr.length?arr:[{}]); XLSX.utils.book_append_sheet(wb,ws,nome); };
-  add("Financeiro", fin.map(d=>({ID:d.id,Data:d.data,Tipo:d.tipo,"Descrição":d.descricao,Identificador:d.identificador,Detalhamento:d.detalhamento,Categoria:d.categoria,Forma:d.forma,Conta:d.conta,"Responsável":d.responsavel,Valor:Number(d.valor),Comprovante:d.comprovante_url})));
+  add("Financeiro", fin.map(d=>({ID:d.id,Data:d.data,Tipo:d.tipo,"Descrição":d.descricao,Identificador:d.identificador,Detalhamento:d.detalhamento,Categoria:d.categoria,Forma:d.forma,Conta:d.conta,Oficial:d.oficial===false?"não":"sim","Responsável":d.responsavel,Valor:Number(d.valor),Comprovante:d.comprovante_url})));
   add("Tríduo", triduo.map(t=>({ID:t.id,Data:t.data,Noite:t.noite,Grupo:t.grupo,"Descrição":t.descricao,Identificador:t.identificador,Forma:t.forma,Conta:t.conta,"Responsável":t.responsavel,Valor:Number(t.valor)})));
   add("Filipetas", filipetas.map(f=>({ID:f.id,Data:f.data,Nome:f.nome,Noite:f.noite,Qtd:Number(f.quantidade||1),Valor:Number(f.valor),Forma:f.forma,Conta:f.conta,Identificador:f.identificador,Status:f.pago?(f.confirmado?"Confirmado":"Pago"):"Pendente","Pago em":f.data_pagamento,"Responsável":f.responsavel,"Observação":f.obs})));
   add("Camisas", vendas.map(v=>({ID:v.id,Data:v.data,Comprador:v.comprador,Tamanho:v.tamanho,Qtd:v.quantidade,"Valor unit.":Number(v.valor_unit),Total:Number(v.valor_total),Pago:Number(v.valor_pago),Falta:Math.max(0,Number(v.valor_total)-Number(v.valor_pago)),"Situação":situacao(v),Forma:v.forma,Entregue:v.entregue?"sim":"não","Entregue em":v.entregue_em,"Obs entrega":v.entrega_obs,"Responsável":v.responsavel,Pagamentos:(Array.isArray(v.pagamentos)?v.pagamentos:[]).map(p=>`${fmtData(p.data)} ${p.forma||""}${p.conta?" ["+p.conta+"]":""}${p.ident?" ("+p.ident+")":""} R$${Number(p.valor).toFixed(2)}`).join(" | ")})));
   const estMap={}; estoque.forEach(e=>{ const k=e.tamanho||"—"; estMap[k]=(estMap[k]||0)+Number(e.quantidade||0); });
   add("Estoque", Object.entries(estMap).map(([t,q])=>({Tamanho:t,Produzida:q,Vendida:vendidasPorTam(t),Entregue:entreguesPorTam(t),Estoque:q-entreguesPorTam(t),"Disponível":q-vendidasPorTam(t)})));
   add("Transferências", transferencias.map(t=>({ID:t.id,Data:t.data,De:t.conta_de||"Caixa",Para:t.conta_para||"Caixa",Valor:Number(t.valor),Identificador:t.identificador,"Observação":t.obs})));
-  add("Reembolsos", reembolsos.map(r=>({ID:r.id,Data:r.data,"Quem pagou":r.pessoa,"Descrição":r.descricao,Categoria:r.categoria,Valor:Number(r.valor),Status:r.ressarcido?"Ressarcido":"Pendente",Forma:r.forma,Conta:r.conta,"Ressarcido em":r.data_ressarcimento,Comprovante:r.comprovante_url})));
+  add("Reembolsos", reembolsos.map(r=>({ID:r.id,Data:r.data,"Quem pagou":r.pessoa,"Descrição":r.descricao,Categoria:r.categoria,Valor:Number(r.valor),Status:r.ressarcido?"Ressarcido":"Pendente",Oficial:r.oficial===false?"não":"sim",Forma:r.forma,Conta:r.conta,"Ressarcido em":r.data_ressarcimento,Comprovante:r.comprovante_url})));
   XLSX.writeFile(wb, "triduo-completo-"+hoje()+".xlsx");
 }
 function movimentosDaConta(nome){

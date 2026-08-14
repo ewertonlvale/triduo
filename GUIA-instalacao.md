@@ -62,7 +62,7 @@ create table if not exists triduo_lancamentos (
 create table if not exists transferencias (
   id uuid primary key default gen_random_uuid(),
   valor numeric not null,
-  sentido text not null check (sentido in ('caixa_conta','conta_caixa')),
+  sentido text not null check (sentido in ('caixa_conta','conta_caixa','conta_conta')),
   data date not null default current_date, obs text,
   created_at timestamptz default now());
 
@@ -83,7 +83,9 @@ create table if not exists filipetas (
 
 create table if not exists contas (
   id uuid primary key default gen_random_uuid(),
-  nome text not null, created_at timestamptz default now());
+  nome text not null, contabiliza boolean not null default true,
+  created_at timestamptz default now());
+alter table contas add column if not exists contabiliza boolean not null default true;
 
 -- Coluna "conta" nos módulos (para Pix/Cartão) e De/Para nas transferências
 alter table lancamentos add column if not exists conta text;
@@ -92,6 +94,10 @@ alter table filipetas add column if not exists conta text;
 alter table reembolsos add column if not exists conta text;
 alter table transferencias add column if not exists conta_de text;
 alter table transferencias add column if not exists conta_para text;
+
+-- Classificação "oficial" (para a contabilização real × oficial no relatório)
+alter table lancamentos add column if not exists oficial boolean not null default true;
+alter table reembolsos add column if not exists oficial boolean not null default true;
 
 -- Segurança: só usuários logados acessam
 alter table categorias enable row level security;
