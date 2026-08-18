@@ -740,9 +740,10 @@ function ligarEventos(){
   $("#btnLimparFil").onclick=()=>{ ["#filBusca","#filFiltroNoite","#filFiltroStatus","#filFiltroForma","#filFiltroConta"].forEach(s=>{ if($(s))$(s).value=""; }); renderFilipetas(); };
   $("#btnFilPdf").onclick=relatorioFilipetasPDF;
   $("#filCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],[data-baixa],[data-confirmar],[data-desconfirmar],.del"); if(!t) return; if(t.classList.contains("del")){ if(confirm("Excluir esta filipeta?")) delFrom("filipetas",t.dataset.id); } else if(t.dataset.confirmar){ confirmarFil(t.dataset.confirmar,true); } else if(t.dataset.desconfirmar){ confirmarFil(t.dataset.desconfirmar,false); } else if(t.dataset.baixa){ baixaFil(t.dataset.baixa); } else if(t.dataset.edit){ editarFil(t.dataset.edit); } };
-  $("#reembCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],[data-rss],[data-desfazer],.del"); if(!t) return;
+  $("#reembCorpo").onclick=e=>{ const t=e.target.closest("[data-edit],[data-rss],[data-desfazer],[data-gerar],.del"); if(!t) return;
     if(t.classList.contains("del")){ if(confirm("Excluir este reembolso?")) delFrom("reembolsos",t.dataset.id); return; }
     if(t.dataset.edit){ editarReemb(t.dataset.edit); return; }
+    if(t.dataset.gerar){ abrirGerarLancamento(t.dataset.gerar); return; }
     if(t.dataset.rss){ const r=reembolsos.find(x=>x.id===t.dataset.rss); ressarcir(t.dataset.rss, (r&&r.forma)||"Dinheiro", (r&&r.conta)||""); return; }
     if(t.dataset.desfazer){ desfazerReemb(t.dataset.desfazer); return; }
   };
@@ -1017,7 +1018,7 @@ function renderReembolsos(){
   const fopts=f=>['Dinheiro','Pix','Cartão','Outro'].map(x=>`<option${x===(f||'Dinheiro')?' selected':''}>${x}</option>`).join("");
   $("#reembCorpo").innerHTML=lista.map(r=>{
     const acao=r.ressarcido?`<span class="tag pago">Ressarcido</span> ${r.forma?formaTag(r.forma):""}${r.conta?` <span style="color:#7a8896;font-size:.72rem">🏦 ${esc(r.conta)}</span>`:""} ${r.data_ressarcimento?`<span style="color:#7a8896;font-size:.75rem">${fmtData(r.data_ressarcimento)}</span>`:""}`:`<span class="tag pend">Pendente</span>${r.forma?" "+formaTag(r.forma):""}`;
-    const botoes=r.ressarcido?`<button class="btn-sec" style="padding:4px 8px" data-desfazer="${r.id}">Desfazer</button>`:`<button class="btn-sec" style="padding:5px 10px;background:var(--verde);color:#fff;border:none" data-rss="${r.id}" title="Marcar como ressarcido (usa a forma/conta do registro; edite no ✏️ para mudar)">✓ Ressarcir</button>`;
+    const botoes=r.ressarcido?`<button class="btn-sec" style="padding:4px 8px" data-desfazer="${r.id}">Desfazer</button>`:`<button class="btn-sec" style="padding:5px 10px;background:var(--verde);color:#fff;border:none" data-rss="${r.id}" title="Marcar como ressarcido (usa a forma/conta do registro; edite no ✏️ para mudar)">✓ Ressarcir</button> <button class="btn-sec" style="padding:5px 10px" data-gerar="${r.id}" title="Transformar em um lançamento de despesa no Financeiro">🧾 Gerar lançamento</button>`;
     return `<tr><td>${fmtData(r.data)}</td><td>${esc(r.pessoa)||"—"}</td><td><b>${esc(r.descricao)||"—"}</b>${r.categoria?` <span style="color:#7a8896;font-size:.78rem">${esc(r.categoria)}</span>`:""} ${anexo(r.comprovante_url)}</td><td class="num">${brl(r.valor)}</td><td>${acao}</td><td style="white-space:nowrap">${botoes} <button class="btn-sec" style="padding:4px 8px" data-edit="${r.id}" title="Editar">✏️</button> <button class="del" data-id="${r.id}" title="Excluir">🗑</button></td></tr>`;
   }).join("");
   $("#reembVazio").style.display=lista.length?"none":"block";
@@ -1056,6 +1057,47 @@ async function addReemb(e){
 }
 async function ressarcir(id,forma,conta){ const {error}=await sb.from("reembolsos").update({ressarcido:true,forma:forma||null,conta:(conta||null),data_ressarcimento:hoje()}).eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
 async function desfazerReemb(id){ const {error}=await sb.from("reembolsos").update({ressarcido:false,data_ressarcimento:null}).eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
+function abrirGerarLancamento(id){
+  const r=reembolsos.find(x=>x.id===id); if(!r) return;
+  const fopts=["Dinheiro","Pix","Cartão","Outro"].map(x=>`<option${x===(r.forma||"Dinheiro")?" selected":""}>${x}</option>`).join("");
+  $("#modalBox").innerHTML=`
+    <button class="btn-fechar" id="mFechar">×</button>
+    <h3>🧾 Gerar lançamento de despesa</h3>
+    <div class="sub">A partir do reembolso${r.pessoa?" de "+esc(r.pessoa):""} · ${brl(r.valor)}</div>
+    <div class="box">
+      <div class="campo" style="margin-bottom:8px"><label>Descrição</label><input type="text" id="glDesc" value="${esc(r.descricao||"")}"></div>
+      <div class="linha-inp">
+        <div class="campo"><label>Valor (R$)</label><input type="number" id="glValor" step="0.01" min="0" value="${Number(r.valor)}"></div>
+        <div class="campo"><label>Data</label><input type="date" id="glData" value="${r.data||hoje()}"></div>
+      </div>
+      <div class="linha-inp" style="margin-top:8px">
+        <div class="campo"><label>Categoria</label><input type="text" id="glCat" list="cats" value="${esc(r.categoria||"")}"></div>
+        <div class="campo"><label>Identificador (quem pagou)</label><input type="text" id="glIdent" value="${esc(r.pessoa||"")}"></div>
+      </div>
+      <div class="linha-inp" style="margin-top:8px">
+        <div class="campo"><label>Forma</label><select id="glForma"><option value="">—</option>${fopts}</select></div>
+        <div class="campo"><label>Conta (opcional)</label><select id="glConta">${optsConta(r.conta||"")}</select></div>
+      </div>
+      <div class="campo full" style="margin-top:8px"><label>Detalhamento</label><input type="text" id="glDet" value="Ressarcimento${r.pessoa?" de "+esc(r.pessoa):""}"></div>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;margin-top:10px"><input type="checkbox" id="glOficial" checked style="width:auto"> Lançamento oficial</label>
+      <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer;margin-top:6px"><input type="checkbox" id="glRemover" checked style="width:auto"> Excluir este reembolso ao gerar <span style="color:#7a8896">(evita contar em dobro)</span></label>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-sec" id="glCriar" style="flex:2;background:var(--vermelho);color:#fff;border:none;padding:12px">Criar despesa</button>
+      <button class="btn-sec" id="glCancelar" style="flex:1">Cancelar</button>
+    </div>`;
+  $("#modalBg").classList.remove("hide");
+  $("#mFechar").onclick=fecharModal; $("#glCancelar").onclick=fecharModal;
+  $("#glCriar").onclick=async()=>{
+    const val=parseFloat($("#glValor").value); if(isNaN(val)||val<=0){ alert("Informe um valor válido."); return; }
+    $("#glCriar").disabled=true; $("#glCriar").textContent="Criando…";
+    const reg={tipo:"despesa",descricao:$("#glDesc").value.trim(),valor:val,categoria:$("#glCat").value.trim(),forma:$("#glForma").value,conta:($("#glConta").value||null),data:$("#glData").value,identificador:$("#glIdent").value.trim(),detalhamento:$("#glDet").value.trim(),oficial:$("#glOficial").checked,comprovante_url:r.comprovante_url||null};
+    const {error}=await sb.from("lancamentos").insert(reg);
+    if(error){ $("#glCriar").disabled=false; $("#glCriar").textContent="Criar despesa"; alert("Erro ao criar: "+error.message); return; }
+    if($("#glRemover").checked){ await sb.from("reembolsos").delete().eq("id",id); }
+    fecharModal(); carregarTudo();
+  };
+}
 
 /* ---------- CAMISAS ---------- */
 async function addEstoque(e){
