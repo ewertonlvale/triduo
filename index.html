@@ -1603,11 +1603,11 @@ function exportarTudo(){
   XLSX.writeFile(wb, "triduo-completo-"+hoje()+".xlsx");
 }
 function movimentosDaConta(nome){
-  const nd=f=>!ehDin(f), mov=[];
-  fin.forEach(d=>{ if(nd(d.forma)&&(d.conta||"")===nome){ const val=Number(d.valor)||0; const rec=d.tipo==="receita"; mov.push({data:d.data,hist:rec?"Receita":"Despesa",desc:d.descricao||"",ident:d.identificador||"",ent:rec?val:0,sai:rec?0:val}); } });
-  triduo.forEach(t=>{ if(nd(t.forma)&&(t.conta||"")===nome){ const val=Number(t.valor)||0; mov.push({data:t.data,hist:"Tríduo "+(t.grupo||""),desc:[t.noite,t.descricao].filter(Boolean).join(" · "),ident:t.identificador||"",ent:val,sai:0}); } });
-  filipetas.forEach(f=>{ if(f.pago&&nd(f.forma)&&(f.conta||"")===nome){ const val=Number(f.valor)||0; mov.push({data:f.data_pagamento||f.data,hist:"Filipeta",desc:[f.nome,f.noite].filter(Boolean).join(" · "),ident:f.identificador||"",ent:val,sai:0}); } });
-  vendas.forEach(v=>{ (Array.isArray(v.pagamentos)?v.pagamentos:[]).forEach(p=>{ if(nd(p.forma)&&(p.conta||"")===nome){ const val=Number(p.valor)||0; mov.push({data:p.data,hist:"Camisa",desc:[v.comprador,v.tamanho].filter(Boolean).join(" · "),ident:p.ident||"",ent:val,sai:0}); } }); });
+  const mov=[]; const ftag=f=>ehDin(f)?" 💵":"";
+  fin.forEach(d=>{ if((d.conta||"")===nome){ const val=Number(d.valor)||0; const rec=d.tipo==="receita"; mov.push({data:d.data,hist:(rec?"Receita":"Despesa")+ftag(d.forma),desc:d.descricao||"",ident:d.identificador||"",ent:rec?val:0,sai:rec?0:val}); } });
+  triduo.forEach(t=>{ if((t.conta||"")===nome){ const val=Number(t.valor)||0; mov.push({data:t.data,hist:"Tríduo "+(t.grupo||"")+ftag(t.forma),desc:[t.noite,t.descricao].filter(Boolean).join(" · "),ident:t.identificador||"",ent:val,sai:0}); } });
+  filipetas.forEach(f=>{ if(f.pago&&(f.conta||"")===nome){ const val=Number(f.valor)||0; mov.push({data:f.data_pagamento||f.data,hist:"Filipeta"+ftag(f.forma),desc:[f.nome,f.noite].filter(Boolean).join(" · "),ident:f.identificador||"",ent:val,sai:0}); } });
+  vendas.forEach(v=>{ (Array.isArray(v.pagamentos)?v.pagamentos:[]).forEach(p=>{ if((p.conta||"")===nome){ const val=Number(p.valor)||0; mov.push({data:p.data,hist:"Camisa"+ftag(p.forma),desc:[v.comprador,v.tamanho].filter(Boolean).join(" · "),ident:p.ident||"",ent:val,sai:0}); } }); });
   // Reembolsos não entram no extrato da conta.
   transferencias.forEach(t=>{ const val=Number(t.valor)||0;
     if((t.conta_de||"")===nome) mov.push({data:t.data,hist:"Transferência (saída)",desc:"Para "+(t.conta_para||"Caixa"),ident:t.identificador||"",ent:0,sai:val});
