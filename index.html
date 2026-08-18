@@ -868,7 +868,7 @@ function contaSaldo(nome){
   triduo.forEach(t=>{ if(!ehDin(t.forma) && (t.conta||"")===nome) s+=Number(t.valor||0); });
   filipetas.forEach(f=>{ if(f.pago && !ehDin(f.forma) && (f.conta||"")===nome) s+=Number(f.valor||0); });
   vendas.forEach(v=>{ (Array.isArray(v.pagamentos)?v.pagamentos:[]).forEach(p=>{ if(!ehDin(p.forma) && (p.conta||"")===nome) s+=Number(p.valor||0); }); });
-  reembolsos.forEach(r=>{ if(r.ressarcido && !ehDin(r.forma) && (r.conta||"")===nome) s-=Number(r.valor||0); });
+  // Reembolsos NÃO afetam saldo (são só controle de pendências; use "Gerar lançamento" para virar despesa).
   transferencias.forEach(t=>{ if((t.conta_de||"")===nome) s-=Number(t.valor||0); if((t.conta_para||"")===nome) s+=Number(t.valor||0); });
   return Math.round(s*100)/100;
 }
@@ -937,7 +937,7 @@ function saldoCaixaDinheiro(){
   });
   triduo.forEach(t=>{ if(isDin(t.forma) && dentro(t.conta)) caixa+=Number(t.valor)||0; });
   transferencias.forEach(t=>{ const val=Number(t.valor)||0; if((t.conta_de&&semT.has(t.conta_de))||(t.conta_para&&semT.has(t.conta_para))) return; if(t.sentido==="caixa_conta") caixa-=val; else if(t.sentido==="conta_caixa") caixa+=val; });
-  reembolsos.forEach(r=>{ if(r.ressarcido && isDin(r.forma) && dentro(r.conta)) caixa-=Number(r.valor)||0; });
+  // Reembolsos não afetam o caixa.
   filipetas.forEach(f=>{ if(f.pago && isDin(f.forma) && dentro(f.conta)) caixa+=Number(f.valor)||0; });
   return Math.round(caixa*100)/100;
 }
@@ -947,7 +947,7 @@ function contaCelula(v){ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; c
 function anexo(url){ return url?`<a class="anexo" href="${url}" target="_blank" title="Ver comprovante">📎</a>`:""; }
 function renderFin(){
   const recM=receitaFin();
-  const desp=despesaFin()+despesaReembolsos();
+  const desp=despesaFin();
   const rec=recM+receitaCamisas()+receitaTriduo()+receitaFilipetas();
   $("#totRec").textContent=brl(rec); $("#totDesp").textContent=brl(desp); $("#totSaldo").textContent=brl(rec-desp);
   $("#cardSaldo").classList.toggle("neg",(rec-desp)<0);
@@ -1457,7 +1457,7 @@ function renderRelatorio(){
   const recTri=receitaTriduo();
   const recFil=receitaFilipetas();
   const recM=receitaFin();
-  const desp=despesaFin()+despesaReembolsos();
+  const desp=despesaFin();
   const rec=recM+recCamisas+recTri+recFil;
   $("#relRec").textContent=brl(rec); $("#relDesp").textContent=brl(desp);
   $("#relSaldo").textContent=brl(rec-desp); $("#relSaldo").style.color=(rec-desp)<0?"var(--vermelho)":"var(--azul)";
@@ -1476,7 +1476,7 @@ function renderRelatorio(){
 
   const semTc=contasSemTotal();
   const recOfic=receitaFinOficial()+recTri+recFil;
-  const despOfic=despesaFinOficial()+despesaReembolsosOficial();
+  const despOfic=despesaFinOficial();
 
   // Real × Oficial
   if($("#relRealOficial")){
@@ -1503,8 +1503,7 @@ function renderRelatorio(){
   $("#relRecCat").innerHTML=linhaCat(recCats,rec,recOfic);
   const dd=porCatRO("despesa");
   const despCats=Object.keys(dd.mr).map(k=>[iconeGrupo(k)+" "+k, dd.mr[k], dd.mo[k]||0]);
-  const remR={}, remO={}; reembolsos.filter(r=>r.ressarcido && !(r.conta&&semTc.has(r.conta))).forEach(r=>{ const k="💸 "+(r.categoria||"Reembolso")+(r.pessoa?" ("+r.pessoa+")":""); remR[k]=(remR[k]||0)+Number(r.valor||0); if(r.oficial!==false) remO[k]=(remO[k]||0)+Number(r.valor||0); });
-  Object.keys(remR).forEach(k=>despCats.push([k,remR[k],remO[k]||0])); despCats.sort((a,b)=>b[1]-a[1]);
+  despCats.sort((a,b)=>b[1]-a[1]); // Reembolsos não entram nas despesas.
   $("#relDespCat").innerHTML=linhaCat(despCats,desp,despOfic);
 
   // por forma
@@ -1514,7 +1513,7 @@ function renderRelatorio(){
   fin.forEach(d=>{ if(d.conta&&semTc.has(d.conta)) return; const t=d.tipo==="receita"?ent:sai; const k=key(d.forma); t[k]=(t[k]||0)+Number(d.valor); });
   vendas.forEach(v=>{ (Array.isArray(v.pagamentos)?v.pagamentos:[]).forEach(p=>{ if(p.conta&&semTc.has(p.conta)) return; const k=key(p.forma); ent[k]=(ent[k]||0)+Number(p.valor||0); }); });
   triduo.forEach(t=>{ if(t.conta&&semTc.has(t.conta)) return; if(Number(t.valor)>0){ const k=key(t.forma); ent[k]=(ent[k]||0)+Number(t.valor); } });
-  reembolsos.forEach(r=>{ if(r.ressarcido && !(r.conta&&semTc.has(r.conta))){ const k=key(r.forma); sai[k]=(sai[k]||0)+Number(r.valor||0); } });
+  // Reembolsos não entram no por-forma.
   filipetas.forEach(f=>{ if(f.pago && !(f.conta&&semTc.has(f.conta))){ const k=key(f.forma); ent[k]=(ent[k]||0)+Number(f.valor||0); } });
   const usadas=formas.filter(f=>ent[f]||sai[f]);
   $("#relForma").innerHTML=(usadas.length?usadas.map(f=>`<tr><td>${f}</td><td class="n">${brl(ent[f]||0)}</td><td class="n">${brl(sai[f]||0)}</td></tr>`).join(""):`<tr><td colspan="3" style="color:#9aa7b2">Sem lançamentos.</td></tr>`)
@@ -1609,7 +1608,7 @@ function movimentosDaConta(nome){
   triduo.forEach(t=>{ if(nd(t.forma)&&(t.conta||"")===nome){ const val=Number(t.valor)||0; mov.push({data:t.data,hist:"Tríduo "+(t.grupo||""),desc:[t.noite,t.descricao].filter(Boolean).join(" · "),ident:t.identificador||"",ent:val,sai:0}); } });
   filipetas.forEach(f=>{ if(f.pago&&nd(f.forma)&&(f.conta||"")===nome){ const val=Number(f.valor)||0; mov.push({data:f.data_pagamento||f.data,hist:"Filipeta",desc:[f.nome,f.noite].filter(Boolean).join(" · "),ident:f.identificador||"",ent:val,sai:0}); } });
   vendas.forEach(v=>{ (Array.isArray(v.pagamentos)?v.pagamentos:[]).forEach(p=>{ if(nd(p.forma)&&(p.conta||"")===nome){ const val=Number(p.valor)||0; mov.push({data:p.data,hist:"Camisa",desc:[v.comprador,v.tamanho].filter(Boolean).join(" · "),ident:p.ident||"",ent:val,sai:0}); } }); });
-  reembolsos.forEach(r=>{ if(r.ressarcido&&nd(r.forma)&&(r.conta||"")===nome){ const val=Number(r.valor)||0; mov.push({data:r.data_ressarcimento||r.data,hist:"Reembolso",desc:r.pessoa||r.descricao||"",ident:"",ent:0,sai:val}); } });
+  // Reembolsos não entram no extrato da conta.
   transferencias.forEach(t=>{ const val=Number(t.valor)||0;
     if((t.conta_de||"")===nome) mov.push({data:t.data,hist:"Transferência (saída)",desc:"Para "+(t.conta_para||"Caixa"),ident:t.identificador||"",ent:0,sai:val});
     if((t.conta_para||"")===nome) mov.push({data:t.data,hist:"Transferência (entrada)",desc:"De "+(t.conta_de||"Caixa"),ident:t.identificador||"",ent:val,sai:0});
