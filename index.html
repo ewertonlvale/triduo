@@ -863,11 +863,11 @@ async function addConta(e){
 async function toggleContaContab(id){ const c=contas.find(x=>x.id===id); if(!c) return; const {error}=await sb.from("contas").update({contabiliza:c.contabiliza===false}).eq("id",id); if(error){ alert("Erro: "+error.message); return; } carregarTudo(); }
 function contaSaldo(nome){
   let s=0;
-  fin.forEach(d=>{ if((d.conta||"")===nome) s+= d.tipo==="receita"?Number(d.valor):-Number(d.valor); });
-  triduo.forEach(t=>{ if((t.conta||"")===nome) s+=Number(t.valor||0); });
-  filipetas.forEach(f=>{ if(f.pago && (f.conta||"")===nome) s+=Number(f.valor||0); });
-  vendas.forEach(v=>{ (Array.isArray(v.pagamentos)?v.pagamentos:[]).forEach(p=>{ if((p.conta||"")===nome) s+=Number(p.valor||0); }); });
-  reembolsos.forEach(r=>{ if(r.ressarcido && (r.conta||"")===nome) s-=Number(r.valor||0); });
+  fin.forEach(d=>{ if(!ehDin(d.forma) && (d.conta||"")===nome) s+= d.tipo==="receita"?Number(d.valor):-Number(d.valor); });
+  triduo.forEach(t=>{ if(!ehDin(t.forma) && (t.conta||"")===nome) s+=Number(t.valor||0); });
+  filipetas.forEach(f=>{ if(f.pago && !ehDin(f.forma) && (f.conta||"")===nome) s+=Number(f.valor||0); });
+  vendas.forEach(v=>{ (Array.isArray(v.pagamentos)?v.pagamentos:[]).forEach(p=>{ if(!ehDin(p.forma) && (p.conta||"")===nome) s+=Number(p.valor||0); }); });
+  reembolsos.forEach(r=>{ if(r.ressarcido && !ehDin(r.forma) && (r.conta||"")===nome) s-=Number(r.valor||0); });
   transferencias.forEach(t=>{ if((t.conta_de||"")===nome) s-=Number(t.valor||0); if((t.conta_para||"")===nome) s+=Number(t.valor||0); });
   return Math.round(s*100)/100;
 }
@@ -923,20 +923,21 @@ function receitaFinOficial(){ const s=contasSemTotal(); return fin.filter(d=>d.t
 function despesaFinOficial(){ const s=contasSemTotal(); return fin.filter(d=>d.tipo==="despesa" && d.oficial!==false && !(d.conta&&s.has(d.conta))).reduce((a,d)=>a+Number(d.valor||0),0); }
 function despesaReembolsosOficial(){ const s=contasSemTotal(); return reembolsos.filter(r=>r.ressarcido && r.oficial!==false && !(r.conta&&s.has(r.conta))).reduce((a,r)=>a+Number(r.valor||0),0); }
 function receitaCamisas(){ const s=contasSemTotal(); return vendas.reduce((acc,v)=>{ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[]; if(pg.length) return acc+pg.reduce((a,p)=>a+((p.conta&&s.has(p.conta))?0:Number(p.valor||0)),0); return acc+Number(v.valor_pago||0); },0); }
-// Dinheiro fica no caixa; o resto (Pix/cartão/outros/sem forma) fica em conta.
+// Caixa = TODO lançamento em Dinheiro (a conta em Dinheiro é só rótulo de segmentação),
+// exceto os de contas marcadas "fora do total". Contas bancárias = só Pix/Cartão.
 function saldoCaixaDinheiro(){
   const isDin=f=>(f||"").trim().toLowerCase()==="dinheiro";
+  const semT=contasSemTotal(); const dentro=c=>!(c&&semT.has(c));
   let caixa=0;
-  fin.forEach(d=>{ if(isDin(d.forma) && !d.conta) caixa+=Number(d.valor)*(d.tipo==="receita"?1:-1); });
+  fin.forEach(d=>{ if(isDin(d.forma) && dentro(d.conta)) caixa+=Number(d.valor)*(d.tipo==="receita"?1:-1); });
   vendas.forEach(v=>{ const pg=Array.isArray(v.pagamentos)?v.pagamentos:[];
-    if(pg.length){ pg.forEach(p=>{ if(isDin(p.forma) && !p.conta) caixa+=Number(p.valor)||0; }); }
+    if(pg.length){ pg.forEach(p=>{ if(isDin(p.forma) && dentro(p.conta)) caixa+=Number(p.valor)||0; }); }
     else if(Number(v.valor_pago)>0 && isDin(v.forma)){ caixa+=Number(v.valor_pago); }
   });
-  triduo.forEach(t=>{ if(isDin(t.forma) && !t.conta) caixa+=Number(t.valor)||0; });
-  const semT=contasSemTotal();
+  triduo.forEach(t=>{ if(isDin(t.forma) && dentro(t.conta)) caixa+=Number(t.valor)||0; });
   transferencias.forEach(t=>{ const val=Number(t.valor)||0; if((t.conta_de&&semT.has(t.conta_de))||(t.conta_para&&semT.has(t.conta_para))) return; if(t.sentido==="caixa_conta") caixa-=val; else if(t.sentido==="conta_caixa") caixa+=val; });
-  reembolsos.forEach(r=>{ if(r.ressarcido && isDin(r.forma) && !r.conta) caixa-=Number(r.valor)||0; });
-  filipetas.forEach(f=>{ if(f.pago && isDin(f.forma) && !f.conta) caixa+=Number(f.valor)||0; });
+  reembolsos.forEach(r=>{ if(r.ressarcido && isDin(r.forma) && dentro(r.conta)) caixa-=Number(r.valor)||0; });
+  filipetas.forEach(f=>{ if(f.pago && isDin(f.forma) && dentro(f.conta)) caixa+=Number(f.valor)||0; });
   return Math.round(caixa*100)/100;
 }
 function formaTag(f){ if(!f) return ""; const cls=f==="Pix"?"pix":f==="Dinheiro"?"dinheiro":f==="Cartão"?"cartao":""; return `<span class="forma ${cls}">${esc(f)}</span>`; }
@@ -1561,12 +1562,12 @@ function exportarTudo(){
   XLSX.writeFile(wb, "triduo-completo-"+hoje()+".xlsx");
 }
 function movimentosDaConta(nome){
-  const mov=[];
-  fin.forEach(d=>{ if((d.conta||"")===nome){ const val=Number(d.valor)||0; const rec=d.tipo==="receita"; mov.push({data:d.data,hist:rec?"Receita":"Despesa",desc:d.descricao||"",ident:d.identificador||"",ent:rec?val:0,sai:rec?0:val}); } });
-  triduo.forEach(t=>{ if((t.conta||"")===nome){ const val=Number(t.valor)||0; mov.push({data:t.data,hist:"Tríduo "+(t.grupo||""),desc:[t.noite,t.descricao].filter(Boolean).join(" · "),ident:t.identificador||"",ent:val,sai:0}); } });
-  filipetas.forEach(f=>{ if(f.pago&&(f.conta||"")===nome){ const val=Number(f.valor)||0; mov.push({data:f.data_pagamento||f.data,hist:"Filipeta",desc:[f.nome,f.noite].filter(Boolean).join(" · "),ident:f.identificador||"",ent:val,sai:0}); } });
-  vendas.forEach(v=>{ (Array.isArray(v.pagamentos)?v.pagamentos:[]).forEach(p=>{ if((p.conta||"")===nome){ const val=Number(p.valor)||0; mov.push({data:p.data,hist:"Camisa",desc:[v.comprador,v.tamanho].filter(Boolean).join(" · "),ident:p.ident||"",ent:val,sai:0}); } }); });
-  reembolsos.forEach(r=>{ if(r.ressarcido&&(r.conta||"")===nome){ const val=Number(r.valor)||0; mov.push({data:r.data_ressarcimento||r.data,hist:"Reembolso",desc:r.pessoa||r.descricao||"",ident:"",ent:0,sai:val}); } });
+  const nd=f=>!ehDin(f), mov=[];
+  fin.forEach(d=>{ if(nd(d.forma)&&(d.conta||"")===nome){ const val=Number(d.valor)||0; const rec=d.tipo==="receita"; mov.push({data:d.data,hist:rec?"Receita":"Despesa",desc:d.descricao||"",ident:d.identificador||"",ent:rec?val:0,sai:rec?0:val}); } });
+  triduo.forEach(t=>{ if(nd(t.forma)&&(t.conta||"")===nome){ const val=Number(t.valor)||0; mov.push({data:t.data,hist:"Tríduo "+(t.grupo||""),desc:[t.noite,t.descricao].filter(Boolean).join(" · "),ident:t.identificador||"",ent:val,sai:0}); } });
+  filipetas.forEach(f=>{ if(f.pago&&nd(f.forma)&&(f.conta||"")===nome){ const val=Number(f.valor)||0; mov.push({data:f.data_pagamento||f.data,hist:"Filipeta",desc:[f.nome,f.noite].filter(Boolean).join(" · "),ident:f.identificador||"",ent:val,sai:0}); } });
+  vendas.forEach(v=>{ (Array.isArray(v.pagamentos)?v.pagamentos:[]).forEach(p=>{ if(nd(p.forma)&&(p.conta||"")===nome){ const val=Number(p.valor)||0; mov.push({data:p.data,hist:"Camisa",desc:[v.comprador,v.tamanho].filter(Boolean).join(" · "),ident:p.ident||"",ent:val,sai:0}); } }); });
+  reembolsos.forEach(r=>{ if(r.ressarcido&&nd(r.forma)&&(r.conta||"")===nome){ const val=Number(r.valor)||0; mov.push({data:r.data_ressarcimento||r.data,hist:"Reembolso",desc:r.pessoa||r.descricao||"",ident:"",ent:0,sai:val}); } });
   transferencias.forEach(t=>{ const val=Number(t.valor)||0;
     if((t.conta_de||"")===nome) mov.push({data:t.data,hist:"Transferência (saída)",desc:"Para "+(t.conta_para||"Caixa"),ident:t.identificador||"",ent:0,sai:val});
     if((t.conta_para||"")===nome) mov.push({data:t.data,hist:"Transferência (entrada)",desc:"De "+(t.conta_de||"Caixa"),ident:t.identificador||"",ent:val,sai:0});
